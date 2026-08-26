@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@layer utilities {
+  /* Hide scrollbars for Chrome, Safari and Opera */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbars for IE, Edge and Firefox */
+  .scrollbar-none {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
+
+/* Global scrollbar removal for clean app feel on phones */
+html,
+body,
+#root {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  background-color: #09090b;
+  /* Do NOT pad html/body for safe-area — that breaks sticky/fixed headers on Android */
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  overscroll-behavior-y: none;
+}
+
+::-webkit-scrollbar {
+  width: 0px;
+  height: 0px;
+  background: transparent;
+  display: none;
+}
+
+/* Fixed top app bar: safe-area lives ON the bar so it never leaves a blank scroll gap */
+.app-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.app-topbar-spacer {
+  /* h-16 (64px) + 2px glow line + safe-area */
+  height: calc(4rem + 2px + env(safe-area-inset-top, 0px));
+}

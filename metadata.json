@@ -1,0 +1,6 @@
+{
+  "name": "NEXUS",
+  "description": "A self-improvement tracker monitoring Health, Spiritual Resonance, Smarts, Self-Care, and Happiness, featuring life expectancy estimates, AI onboarding, proof verification, and journal insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GROQ_API"]
+}
