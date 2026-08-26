@@ -19,6 +19,7 @@ export const DEFAULT_USER_CONFIG: UserConfig = {
   healthApiSyncEnabled: false,
   privacyAccepted: false,
   unlockedBadges: [],
+  aiServerUrl: 'https://nexus-kp8w.onrender.com',
   locationOptIn: false,
 };
 
