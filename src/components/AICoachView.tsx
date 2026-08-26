@@ -729,6 +729,9 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
           {/* Input Bar */}
           <div className="pt-2 space-y-2 shrink-0">
+            <p className="text-[10px] text-zinc-500 leading-snug">
+              First AI reply can take about a minute if the hosted server is waking up.
+            </p>
             <button
               type="button"
               onClick={() => handleSendMessage('What should I do next based on my goals, journal, and current momentum?')}
