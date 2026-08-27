@@ -169,3 +169,57 @@ export async function fetchGoalResearch(
   const staticFinding = STATIC_KNOWLEDGE[category] || STATIC_KNOWLEDGE.health;
   return { findings: staticFinding, source: 'static' };
 }
+
+// --- Quick chat search (lightweight, for injecting web context into chat) ----
+
+
+
+
+export async function quickChatSearch(
+  topic: string,
+  serperKey?: string
+): Promise<string | null> {
+  const query = `${topic} overview summary`
+  // Try Serper first (fast, structured)
+  if (serperKey) {
+    try {
+      const res = await fetch(SERPER_URL, {
+        method: 'POST',
+        headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: query, num: 3 }),
+        signal: AbortSignal.timeout(3000),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const parts: string[] = []
+        if (data.answerBox?.snippet) parts.push(data.answerBox.snippet)
+        if (data.knowledgeGraph?.description) parts.push(data.knowledgeGraph.description)
+        ;(data.organic as any[] || []).slice(0, 2).filter((r: any) => r.snippet).forEach((r: any) => parts.push(r.snippet))
+        if (parts.length) return parts.join(' ').slice(0, 400)
+      }
+    } catch { /* fall through */ }
+  }
+  // Fallback: DDG instant answer
+  try {
+    const result = await searchDDG(query)
+    if (result && result.length > 80) return result.slice(0, 400)
+  } catch { /* fall through */ }
+  return null
+}
+
+export function detectChatSearchTopic(userMessage: string): string | null {
+  const lower = userMessage.toLowerCase()
+  const mediaKw = ['movie','film','show','series','season','episode','album','song','artist','singer','band','book','novel','game','anime','manga']
+  const hasMedia = mediaKw.some(k => lower.includes(k))
+  if (!hasMedia) return null
+  // Extract quoted or capitalized phrase as topic
+  const quoted = userMessage.match(/"([^"]+)"/)
+  if (quoted) return quoted[1]
+  // Grab 2-4 word phrase after media keyword
+  const m = userMessage.match(/(?:watched|watch|listening to|played|read|saw|loved|hated|finished)\s+([A-Z][^.?!,]{3,50})/i)
+  if (m) return m[1].trim()
+  // Fallback: grab anything that looks like a title (multiple caps)
+  const titleMatch = userMessage.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\b/)
+  if (titleMatch) return titleMatch[1]
+  return null
+}

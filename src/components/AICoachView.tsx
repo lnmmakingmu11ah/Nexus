@@ -192,7 +192,9 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
       const res = await aiClient.chatCompanion({
         messages: apiMessages,
+        nexusPersona: userConfig.nexusPersona,
         userContext: {
+
           userName: userConfig.userName,
           lifePathGoal: userConfig.lifePathGoal,
           stage: 'open_chat',
@@ -231,17 +233,30 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
       setBrainOffline(false);
       setLastAiError(null);
-      const aiMsg: AIChatMessage = {
-        id: `ai-${Date.now()}`,
-        sender: 'ai',
-        text: res.reply,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
 
-      const updatedHistory = [...newMessages, aiMsg];
-      setChatMessages(updatedHistory);
-      // Save chat history immediately
-      const configWithHistory = { ...userConfig, aiChatHistory: updatedHistory };
+      const bubbles: string[] = res.messages && res.messages.length > 0
+        ? res.messages
+        : [res.reply];
+
+      // Drip bubbles one by one with realistic typing delays between them
+      let runningMessages = [...newMessages];
+      for (let i = 0; i < bubbles.length; i++) {
+        if (i > 0) {
+          // Show typing indicator briefly between bubbles
+          await new Promise<void>((resolve) => setTimeout(resolve, 700 + Math.random() * 700));
+        }
+        const bubble: AIChatMessage = {
+          id: `ai-${Date.now()}-${i}`,
+          sender: 'ai',
+          text: bubbles[i],
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        runningMessages = [...runningMessages, bubble];
+        setChatMessages([...runningMessages]);
+      }
+
+      // Save entire history + persona after all bubbles are shown
+      const configWithHistory = { ...userConfig, aiChatHistory: runningMessages };
       onUpdateUserConfig(configWithHistory);
 
             // Extract & merge memory in background (non-blocking)
@@ -278,6 +293,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
             }
           })
           .catch(() => { /* memory extraction is best-effort */ });
+
     } catch (err: any) {
       console.error('NEXUS chat error:', err);
       setBrainOffline(true);

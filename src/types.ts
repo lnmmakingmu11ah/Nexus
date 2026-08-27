@@ -128,6 +128,18 @@ export interface AIMemory {
   lastUpdated?: string;
 }
 
+/** NEXUS AI persona — the AI's consistent fake "life" facts, never contradicted */
+export interface NexusPersona {
+  lastMentionedShow?: string;    // e.g. "Arcane Season 2"
+  lastMentionedPlace?: string;   // e.g. "the gym (skipped leg day again 😭)"
+  lastMentionedFood?: string;    // e.g. "jollof rice"
+  lastMentionedSong?: string;    // e.g. "Kendrick - Not Like Us"
+  opinions?: string[];           // e.g. ["hates pineapple on pizza", "thinks Interstellar > Inception"]
+  funFacts?: string[];           // small canon facts NEXUS has stated about itself
+  angryAt?: string | null;       // set when NEXUS storms off; cleared next session open
+  updatedAt?: string;
+}
+
 export interface UserConfig {
   onboarded: boolean;
   userName?: string;
@@ -146,6 +158,7 @@ export interface UserConfig {
   aiChatHistory?: AIChatMessage[];
   onboardingTranscript?: { sender: 'user' | 'ai'; text: string }[];
   aiMemory?: AIMemory;
+  nexusPersona?: NexusPersona;    // AI consistent fake-life memory
   aiServerUrl?: string;
   behaviorProfile?: BehaviorProfile;
   locationOptIn?: boolean;

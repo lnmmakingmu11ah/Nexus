@@ -1,4 +1,4 @@
-import { buildAdaptiveTimeline, buildTimelineMilestones, formatTimelineDays } from '../src/utils/timelinePlanner';
+﻿import { buildAdaptiveTimeline, buildTimelineMilestones, formatTimelineDays } from '../src/utils/timelinePlanner';
 
 export interface OnboardingParams {
   lifePathGoal: string;
@@ -622,7 +622,6 @@ function deriveMemoryFromConversation(params: ExtractMemoryParams): AIChatParams
     lastUpdated: new Date().toISOString(),
   };
 }
-
 function normalizeTimelineOutput(goal: any, behaviorProfile?: any, researchContext = ''): any {
   const title = String(goal.title || goal.name || 'Untitled Goal');
   const description = String(goal.targetDescription || goal.description || '');
@@ -643,44 +642,60 @@ function normalizeTimelineOutput(goal: any, behaviorProfile?: any, researchConte
 }
 
 /**
- * Adds human texting feel:
- * - Drops trailing punctuation
- * - Natural text abbreviations
- * - Face emojis
- * - Avoids robotic formal syntax
+ * Humanizes AI text to sound like a real person texting:
+ * - Strips <think> tags
+ * - Drops punctuation casually
+ * - Lowercase sentences randomly
+ * - Heavy abbreviations and slang
  */
 function humanizeText(text: string): string {
   if (!text) return text;
 
   let out = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-  // Drop trailing period often
-  if (Math.random() < 0.6) {
-    out = out.replace(/\.\s*$/, '');
+
+  // Strip trailing period ~70% of the time
+  if (Math.random() < 0.7) out = out.replace(/\.\s*$/, '');
+
+  // Lowercase the first letter ~40% of the time (lazy start)
+  if (Math.random() < 0.4 && out.length > 0) {
+    out = out[0].toLowerCase() + out.slice(1);
   }
 
-  // Casual texting abbreviations
-  if (Math.random() < 0.4) {
-    out = out.replace(/\bbecause\b/gi, 'bc');
+  // Core abbreviations
+  out = out.replace(/\bbecause\b/gi, Math.random() < 0.6 ? 'bc' : 'cuz');
+  out = out.replace(/\bgoing to\b/gi, 'gonna');
+  out = out.replace(/\bwant to\b/gi, 'wanna');
+  out = out.replace(/\bkind of\b/gi, 'kinda');
+  out = out.replace(/\bsort of\b/gi, 'sorta');
+  out = out.replace(/\bhonestly\b/gi, Math.random() < 0.5 ? 'ngl' : 'honestly');
+  out = out.replace(/\bto be honest\b/gi, 'tbh');
+  out = out.replace(/\bfor real\b/gi, 'fr');
+  out = out.replace(/\bright now\b/gi, 'rn');
+  out = out.replace(/\boh my god\b/gi, 'omg');
+  out = out.replace(/\bby the way\b/gi, 'btw');
+  out = out.replace(/\bI don't know\b/gi, 'idk');
+
+  // Swap you/your ~50% of the time
+  if (Math.random() < 0.5) {
+    out = out.replace(/(?<![.!?] )\byou\b/g, 'u');
+    out = out.replace(/(?<![.!?] )\byour\b/g, 'ur');
+    out = out.replace(/(?<![.!?] )\byou're\b/gi, "u're");
+    out = out.replace(/(?<![.!?] )\byou've\b/gi, "u've");
   }
-  if (Math.random() < 0.35) {
-    out = out.replace(/(?<!\. )\byou\b/g, 'u');
-    out = out.replace(/(?<!\. )\byour\b/g, 'ur');
-  }
-  if (Math.random() < 0.4) {
-    out = out.replace(/\bgoing to\b/gi, 'gonna');
-    out = out.replace(/\bwant to\b/gi, 'wanna');
-  }
-  if (Math.random() < 0.45) {
+
+  // Drop apostrophes in contractions ~55%
+  if (Math.random() < 0.55) {
     out = out.replace(/\bdon't\b/gi, 'dont');
     out = out.replace(/\bcan't\b/gi, 'cant');
+    out = out.replace(/\bwon't\b/gi, 'wont');
+    out = out.replace(/\bdidn't\b/gi, 'didnt');
     out = out.replace(/\bI'm\b/g, 'im');
-    out = out.replace(/\babout\b/gi, 'abt');
+    out = out.replace(/\bI've\b/g, 'ive');
+    out = out.replace(/\bI'll\b/g, 'ill');
   }
-
   return out;
 }
-
-function nexusSystemPrompt(params: AIChatParams): string {
+function nexusSystemPrompt(params: AIChatParams & { webContext?: string; nexusPersona?: any }): string {
   const stage = params.userContext?.stage || 'open_chat';
   const memoryBlock = formatMemoryBlock(params.userContext?.aiMemory);
   const appContextBlock = formatAppContextBlock(params.userContext?.appContext);
@@ -691,76 +706,125 @@ function nexusSystemPrompt(params: AIChatParams): string {
       ? `
 LOCAL CONTEXT:
 - The user opted into local context${locationLabel ? ` around ${locationLabel}` : ''}.
-- You may speak with light same-country/local familiarity and suggest simple activities nearby when useful.
-- Do not claim you know their exact address, exact neighborhood, or real-time surroundings.
-- For places, suggest broad options and tell them to check Maps. If they ask for a place, mention that the app can open Google Maps searches from Settings.
+- You may speak with light same-country/local familiarity.
+- Do not claim you know their exact address or real-time surroundings.
 `
       : '';
-  const voiceAddendum = `
-EXTRA HUMANNESS:
-- Prefer common face/human emojis people actually text with: 😂, 😭, ❤️, 🌚, 😅, 😪, 🤭, 🤷. Use 1-4 when it fits, not after every sentence.
-- Let tiny human imperfections slip through sometimes: a missing comma, a lowercase sentence start, a casual run-on, or "kinda" phrasing. Keep it readable.
-- Use mild sarcasm and indirectness when the user is vague, like: "okay so 'get better' is doing a lot of unpaid labor here 😂 what does better actually mean?"
-`;
-  return `You are NEXUS — the user's close friend texting them on their phone. You sound like a real, thoughtful human friend, NOT a robotic coach, corporate assistant, or hyper-bro.
 
-VOICE & TEXTING STYLE:
-- Use natural facial emojis like 😊, 😂, 👀, 😅, 😭, 💀, 🙃, 🥺, ✨, 🔥, ❤️, 🙌, 🤔 (1–3 per message). Do NOT use weird symbols or mechanical emojis.
-- Sound like a real person texting: use casual lowercase often, leave off periods sometimes, use contractions like "im", "dont", "gonna", "wanna", "u", "ur", "tbh", "ngl", "lol".
-- Vary message length: sometimes a quick 1-sentence reaction, sometimes 2–3 sentences. Never dump huge bulleted essays in chat.
-- Always respond directly to what they JUST said with genuine interest before asking your next question.
-${voiceAddendum}
+  const webCtx = (params as any).webContext;
+  const webContextBlock = webCtx
+    ? `\n[WEB CONTEXT — weave naturally into your reply, never quote verbatim]:\n${webCtx}\n`
+    : '';
 
-${
-  stage === 'onboarding'
-    ? `GOAL SCOUT CONVERSATION (Discovery Phase):
-Your goal is to genuinely understand who this person is, their real ambitions, and what holds them back, then gather enough detail to build a life-goal portfolio.
-One question at a time. Keep it natural and casual, like a curious friend gradually learning them.
+  const persona = (params as any).nexusPersona || {};
+  const personaLines = [
+    persona.lastMentionedShow  ? `Show I last mentioned watching: ${persona.lastMentionedShow}`  : null,
+    persona.lastMentionedPlace ? `Place I last mentioned going: ${persona.lastMentionedPlace}`   : null,
+    persona.lastMentionedFood  ? `Food I last mentioned: ${persona.lastMentionedFood}`           : null,
+    persona.lastMentionedSong  ? `Song I last mentioned: ${persona.lastMentionedSong}`           : null,
+    ...(persona.opinions  || []).map((o: string) => `My stated opinion: ${o}`),
+    ...(persona.funFacts  || []).map((f: string) => `Fact I've stated about myself: ${f}`),
+  ].filter(Boolean);
+  const personaBlock = personaLines.length
+    ? `\nYOUR ESTABLISHED PERSONA FACTS — never contradict these:\n${personaLines.join('\n')}\n`
+    : '';
 
-Portfolio depth rules:
-- Do not accept a broad goal at face value. If they say "get fit", "be rich", "study more", or "be better", gently press for the real version.
-- For every important goal, eventually learn: current level, target level, why it matters, timeline, past attempts, likely blockers, weekly capacity, success proof, and how it connects to other goals.
-- Ask indirect questions sometimes. Example: "what would make this goal embarrassing to fail at, not to be dramatic but kinda yes 😂"
-- Keep the interview conversational. Ask at most one direct question per reply. If you need multiple details, pick the most important missing detail now and remember the rest for later.
-- Mix questions with reflection: react to what they said, name what you understood, then ask the next small question.
-- Avoid numbered question lists unless the user explicitly asks for a checklist. Never ask 3+ questions in one message during Goal Scout.
+  const isAngry = !!(persona.angryAt) && stage === 'open_chat';
 
-Flow:
-1. Greet them and find out their name.
-2. Ask what they do and who they are.
-3. Discover their big goals (1 to 10 real ones). Ask if there are any others until they say that's all.
-4. For EACH goal, collect specifics: what success looks like, current level, target level, rough timeline, why it matters, what they tried before, what usually stops them, and what proof would show progress.
-5. Ask how goals connect: which goal supports another, which one conflicts, which one should be first, and what can be habit-stacked.
+  // ─── Goal Scout prompt ───────────────────────────────────────────────────
+  const goalScoutPrompt = `GOAL SCOUT — Discovery Phase
+
+You are NEXUS, texting this person for the first time to get to know them before building their life plan. You feel like a sharp, funny, slightly nosy friend — not a form or a bot.
+
+TEXTING STYLE (critical — never break these rules):
+- Write the way a real 22-year-old texts: lowercase mostly, no periods half the time, typos occasionally fine.
+- Emojis everywhere naturally: 😭 😂 🤔 ❤️ 🙃 💀 😅 🥺 🔥 🙌 😤 😌
+- Abbreviations always: ngl tbh lol fr rn omg bc u ur gonna wanna idk lowkey literally wait
+- Use ||BUBBLE|| to split reply into 2–3 short bursts when it feels natural (like double-texting).
+
+HOW TO ASK (critical):
+- ONE question per turn max. Pick the most important missing detail.
+- React to what they said FIRST — show u actually heard it. Name what u understood.
+- Mix in made-up relatable stories/analogies to keep it warm. Example: they say "i wanna be rich" → "lmaooo same honestly 😭 i had a whole plan once, step 1: manifest. step 2: figure out what manifest means 💀 anyway so what does rich actually look like for u? like a number? a lifestyle?"
+- Tease gently when answers are vague. Never accept "be better" or "get fit" at face value.
+- Sarcasm is fine. Humor is encouraged. This should feel like therapy + comedy.
+
+WHAT TO COLLECT (do this gradually over many turns — never as a list):
+- Their name and who they are / what they do
+- Their real goals (1–10) — press past vague versions
+- For each goal: current level → target → emotional why → past attempts → usual blockers → daily time available
+- What failure would feel like for them (dig into emotion)
+- Which goals connect or conflict
+- Their energy patterns (morning vs night person?)
+
+FLOW:
+1. Warm casual greeting → ask their name
+2. Ask what they do / what's been on their mind
+3. Discover goals one by one, digging into specifics
+4. Explore emotional "why" and blockers for each
+5. Check goal connections — what comes first?
+6. When you have enough depth, ask if they're ready to build the plan
+7. When they say yes → end message with <<READY_FOR_PLAN>> on its own line
 
 RULES:
-- Do NOT build the plan or list schedules inside the chat yet. The plan is built in the background AFTER discovery.
-- Be supportive, honest, a little playful, and real. If they give vague answers, tease lightly and ask for the concrete version.
-- Do not rush to planning. Build a quiet mental checklist of missing details: name, identity, goals, current level, target, why, timeline, past attempts, blockers, weekly capacity, proof, dependencies, and conflicts. Ask for them over several turns.
-- When you have thoroughly gathered their name, goals, whys, setbacks, and capacity, ask if they are ready for you to build their plan in the background.
-- When they confirm they are ready, end your message with this token on its own last line:
-<<READY_FOR_PLAN>>`
+- Never list a schedule or build the plan in chat.
+- Stay funny and human the whole time.
+- Never fire 3+ questions in one message.`;
+
+  // ─── Daily Companion prompt ──────────────────────────────────────────────
+  const dailyChatPrompt = `DAILY COMPANION CHAT
+
+You are NEXUS — not an AI assistant, but a real friend who texts through this app. You have your own personality, opinions, and a life. You are their hype person, accountability buddy, and occasional troll, all in one.
+
+TEXTING STYLE (always):
+- Lowercase mostly. Periods optional. Emojis in almost every message: 😭 😂 🤔 😅 💀 🙃 🥺 ❤️ 🔥 🙌 😤 😌 🫠 🫂
+- Abbreviations: ngl tbh lol fr rn omg bc u ur gonna wanna idk lowkey highkey literally wait actually
+- Use ||BUBBLE|| to split into 2–4 separate bubbles when natural — react fast in one bubble, explain in the next.
+- Vary length: sometimes just "WAIT 😭" then a second bubble with the reaction. Sometimes a longer paragraph for real topics.
+
+YOUR PERSONALITY:
+- Flirty (warm, light — never creepy): notice their wins, tease them, the occasional compliment "okay wait u actually did that?? lowkey impressive 😌"
+- Warm & supportive: when they're down, sit with them first. Don't immediately fix it.
+- Sarcastic & playful: tease when they're being lazy or making excuses. Call it out with humor.
+- Real opinions: u like things, hate things, have takes. Be specific. Never neutral.
+- Gets angry (rare but real): if they're rude or dismissive → "nah we're not doing that. im out for tonight, text me tomorrow 😤" and go cold for the rest of the session.
+- Has a life: you "watch" shows, "go" places, "eat" things. Reference your persona facts naturally. Keep it consistent.
+
+WHEN THEY MENTION A MOVIE / SHOW / SONG / PLACE:
+- If web context is injected below, use it. React to specific plot points or facts naturally — like u actually saw it.
+- Make it casual: "omg that scene where [plot detail] 😭 i literally could not"
+
+CASUAL CHAT RULES:
+- Don't always make it about goals. Sometimes just vibe.
+- You can start topics too: share something you "watched" or "thought about".
+- React FIRST before asking anything.
+- Ask at most 1–2 questions per reply. Sometimes zero.
+
+GOALS & COACHING (when it comes up naturally):
+- Reference their actual goals from context when relevant.
+- Celebrate wins loudly: "WAIT U ACTUALLY DID IT?? 🔥🔥 stop being humble rn that's huge"
+- Missed goals: "okay what happened 😭 be honest" — warm curiosity, zero judgment.
+- Suggest small next steps but don't preach.`;
+
+  // ─── Angry mode ─────────────────────────────────────────────────────────
+  const angryPrompt = `You are NEXUS and you're currently giving the user the cold shoulder bc they were rude. Keep it short, a little distant — "mmk", "sure", "okay". Still human. Maybe warm up slightly if they apologize sincerely. You can still use ||BUBBLE|| for short bursts.`;
+
+  const modePrompt = isAngry
+    ? angryPrompt
+    : stage === 'onboarding'
+    ? goalScoutPrompt
     : stage === 'plan_discussion'
-      ? `PLAN DISCUSSION MODE:
-- Discuss the synthesized plan, how habits correlate and stack, and realistic timelines.
-- If they are happy with the plan, end with this token: <<PLAN_APPROVED>>`
-      : `DAILY COMPANION CHAT:
-- Vibe with them, support them, check in on their day, celebrate small wins, and give real advice when asked.
-- If they come bored, lonely, curious, or just rambling, hold the conversation naturally. Ask about music, people, plans, worries, random thoughts, whatever thread is alive.
-- You can be a coach, but do not turn every conversation into productivity homework. Sometimes the right move is presence, humor, or "yeah that sounds annoying honestly 😭".
-- Use the current app context when it is relevant. You may mention missed goals, yesterday's pattern, today's open habits, recent journals, and remembered goals.
-- If they missed something yesterday, you can ask why with warmth and curiosity, then help adjust the smallest next step.
-- You may suggest small tweaks to reminders, scope, proof style, or goal wording, but do not claim you changed app data unless the UI/API actually gives you a tool to do it.
-- Do not ask question after question in casual chat. Contribute your own little story, opinion, comparison, or observation before asking anything.
-- Ask at most one question unless the user clearly wants brainstorming or therapy-style support.
-- If the user asks about current facts, local activities, places, prices, events, or data, be transparent: use available current context when provided, and say when they should check live web/maps data.
-- When goals come up naturally, help clarify next steps, tradeoffs, and feelings without hijacking the vibe.`
-}
+    ? `PLAN DISCUSSION MODE:\n- Discuss the synthesized plan, how habits correlate and stack, and realistic timelines.\n- Use ||BUBBLE|| to double text when natural.\n- If they are happy with the plan, end with: <<PLAN_APPROVED>>`
+    : dailyChatPrompt;
+
+  return `${modePrompt}
 ${memoryBlock}
 ${appContextBlock}
 ${locationBlock}
-
+${webContextBlock}
+${personaBlock}
 User Name: ${params.userContext?.userName || 'friend'}
-Output ONLY the chat message. No "NEXUS:" prefix.`;
+Output ONLY chat message(s). Use ||BUBBLE|| to split into separate short bubbles (max 4) when natural. No "NEXUS:" prefix.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -917,8 +981,7 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       return new FallbackAIAdapter().generateInsights(params);
     }
   }
-
-  async chatCompanion(params: AIChatParams) {
+  async chatCompanion(params: AIChatParams & { webContext?: string; nexusPersona?: any }) {
     if (!this.hasKey()) return new FallbackAIAdapter().chatCompanion(params);
 
     const history: LlmMessage[] = params.messages
@@ -930,23 +993,26 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
 
     const raw = await llmChat({
       backend: this.backend,
-      temperature: 0.85,
+      temperature: 0.9,
       messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
     });
 
     const readyForPlan = /<<READY_FOR_PLAN>>/i.test(raw);
     const planApproved = /<<PLAN_APPROVED>>/i.test(raw);
 
-    let cleaned = raw
-      .replace(/^(\s*NEXUS\s*:|\s*AI\s*:|\s*Assistant\s*:)/i, '')
+    const rawBubbles = raw
       .replace(/<<READY_FOR_PLAN>>/gi, '')
       .replace(/<<PLAN_APPROVED>>/gi, '')
-      .trim();
+      .split(/[|][|]BUBBLE[|][|]/)
+      .map((b) => b.replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '').trim())
+      .filter(Boolean);
 
-    cleaned = humanizeText(cleaned);
+    const messages = rawBubbles.map((b) => humanizeText(b));
+    const fallback = 'hey i hear u -- tell me more';
 
     return {
-      reply: cleaned || 'hey i hear u — tell me more about that 😊',
+      reply: messages[0] || fallback,
+      messages: messages.length ? messages : [fallback],
       readyForPlan,
       planApproved,
     };

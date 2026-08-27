@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, Bot, User, Loader2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { UserConfig, AIChatMessage, Goal } from '../types';
@@ -121,27 +121,35 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       setLastAiError(null);
       if (res.readyForPlan) setReadyForPlan(true);
 
-      const aiMsg: AIChatMessage = {
-        id: `ai-${Date.now()}`,
-        sender: 'ai',
-        text: stripPlanToken(res.reply),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setChatMessages((prev) => [...prev, aiMsg]);
+      const bubbles: string[] = (res.messages && res.messages.length > 0)
+        ? res.messages
+        : [res.reply];
+
+      for (let i = 0; i < bubbles.length; i++) {
+        if (i > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 650 + Math.random() * 650));
+        }
+        const bubble: import('../types').AIChatMessage = {
+          id: `ai--`,
+          sender: 'ai',
+          text: stripPlanToken(bubbles[i]),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setChatMessages((prev) => [...prev, bubble]);
+      }
     } catch (err: any) {
       console.error('Onboarding chat error:', err);
       setBrainOffline(true);
       const errText = err?.detail || err?.message || String(err);
       setLastAiError(errText);
-      const isNetwork =
-        err?.code === 'NETWORK_OFFLINE' || /Cannot reach/i.test(errText);
+      const isNetwork = err?.code === 'NETWORK_OFFLINE' || /Cannot reach/i.test(errText);
       const reply = isNetwork
-        ? `${apiOfflineMessage(Capacitor.isNativePlatform())}\n\n(meanwhile) ${smartOfflineReply(text, 'onboarding', userNameInput || undefined)}`
+        ? `\n\n(meanwhile) `
         : smartOfflineReply(text, 'onboarding', userNameInput || undefined);
       setChatMessages((prev) => [
         ...prev,
         {
-          id: `ai-err-${Date.now()}`,
+          id: `ai-err-`,
           sender: 'ai',
           text: reply,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -180,7 +188,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 Goal Scout <span className="text-amber-400 font-mono text-[10px]">1-time setup</span>
               </h2>
               <p className="text-[11px] text-zinc-400 font-light truncate">
-                {brainOffline ? 'Offline mode' : 'Talk with NEXUS — plan builds in the background'}
+                {brainOffline ? 'Offline mode' : 'Talk with NEXUS â€” plan builds in the background'}
               </p>
             </div>
           </div>
@@ -244,12 +252,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             <div ref={chatEndRef} />
           </div>
 
-          {/* Background plan CTA — appears after enough discovery */}
+          {/* Background plan CTA â€” appears after enough discovery */}
           {showPlanCta && (
             <div className="shrink-0 px-4 py-2.5 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-t border-amber-500/30 flex items-center justify-between gap-2">
               <span className="text-[11px] text-amber-300 font-light flex items-center gap-1 min-w-0">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="truncate">Ready! Plan builds while u explore the app ✨</span>
+                <span className="truncate">Ready! Plan builds while u explore the app âœ¨</span>
               </span>
               <button
                 type="button"

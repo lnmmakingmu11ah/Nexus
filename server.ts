@@ -6,6 +6,8 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { getAIAdapter } from './server/aiAdapter';
+import { quickChatSearch, detectChatSearchTopic } from './server/searchService';
+
 
 async function startServer() {
   const app = express();
@@ -108,8 +110,31 @@ async function startServer() {
   const handleChatCompanion = async (req: express.Request, res: express.Response) => {
     try {
       const adapter = getAIAdapter();
-      const result = await adapter.chatCompanion(req.body);
-      return res.json(result);
+      const body = req.body;
+
+      // Detect if user message references a movie/show/song/book → search for context
+      const lastUserMsg: string = (body.messages || [])
+        .filter((m: any) => m.sender === 'user')
+        .slice(-1)[0]?.text || '';
+      const searchTopic = detectChatSearchTopic(lastUserMsg);
+      let webContext: string | undefined;
+      if (searchTopic) {
+        webContext = await quickChatSearch(
+          searchTopic,
+          process.env.SERPER_API_KEY
+        ) || undefined;
+      }
+
+      const result = await adapter.chatCompanion({
+        ...body,
+        webContext,
+        nexusPersona: body.nexusPersona,
+      });
+
+      return res.json({
+        ...result,
+        messages: (result as any).messages || [result.reply],
+      });
     } catch (err: any) {
       console.error('Chat Companion AI error:', err);
       return res.status(500).json({ error: err.message || 'AI service error' });
@@ -117,6 +142,7 @@ async function startServer() {
   };
   app.post('/api/ai/chat', handleChatCompanion);
   app.post('/api/gemini/chat', handleChatCompanion);
+
 
   // 6. Synthesize Blueprint & Timelines Endpoint
   const handleSynthesizeBlueprint = async (req: express.Request, res: express.Response) => {

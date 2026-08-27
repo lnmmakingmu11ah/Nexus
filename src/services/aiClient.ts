@@ -214,7 +214,7 @@ export const aiClient = {
     });
   },
 
-  async chatCompanion(data: AIChatRequest): Promise<{ reply: string; readyForPlan?: boolean; planApproved?: boolean }> {
+  async chatCompanion(data: AIChatRequest & { nexusPersona?: any }): Promise<{ reply: string; messages: string[]; readyForPlan?: boolean; planApproved?: boolean }> {
     const result = await apiFetch('/api/ai/chat', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -222,8 +222,12 @@ export const aiClient = {
     if (!result?.reply || typeof result.reply !== 'string') {
       throw new AiClientError('AI returned an empty reply', 'EMPTY_REPLY');
     }
-    return result;
+    return {
+      ...result,
+      messages: Array.isArray(result.messages) ? result.messages : [result.reply],
+    };
   },
+
 
   async extractMemory(data: {
     messages: { sender: 'user' | 'ai'; text: string }[];
