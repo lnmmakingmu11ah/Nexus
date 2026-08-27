@@ -908,12 +908,16 @@ export default function App() {
             userConfig={userConfig}
             onUpdateUserConfig={handleUpdateUserConfig}
             onAddGoals={handleBatchAddGoals}
+            onToggleGoal={handleToggleGoal}
+            onNavigateTab={(tab) => setCurrentTab(tab as any)}
+            onSaveJournal={handleSaveJournal}
             existingGoals={goals}
             dailyLogs={dailyLogs}
             journals={journals}
             currentScore={scoreData.composite}
           />
         )}
+
 
         {currentTab === 'journal' && (
           <JournalView

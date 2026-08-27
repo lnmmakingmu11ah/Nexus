@@ -32,10 +32,113 @@ interface AICoachViewProps {
   userConfig: UserConfig;
   onUpdateUserConfig: (updated: UserConfig) => void;
   onAddGoals: (goals: Partial<Goal>[]) => void;
+  onToggleGoal?: (goalId: string) => void;
+  onNavigateTab?: (tab: string) => void;
+  onSaveJournal?: (journal: DailyJournal) => void;
   existingGoals: Goal[];
   dailyLogs: DailyGoalLog[];
   journals: DailyJournal[];
   currentScore?: number;
+}
+
+function parseAndExecuteAction(
+  rawText: string,
+  existingGoals: Goal[],
+  onAddGoals: (goals: Partial<Goal>[]) => void,
+  onToggleGoal?: (goalId: string) => void,
+  onNavigateTab?: (tab: string) => void,
+  onSaveJournal?: (journal: DailyJournal) => void
+): { cleanedText: string; actionTag?: string } {
+  let cleaned = rawText;
+  let actionTag: string | undefined;
+
+  const actionRegex = /<<ACTION:(ADD_GOAL|COMPLETE_GOAL|NAVIGATE|ADD_JOURNAL):([\s\S]*?)>>/gi;
+  let match;
+
+  while ((match = actionRegex.exec(rawText)) !== null) {
+    const actionType = match[1].toUpperCase();
+    const payload = match[2].trim();
+    cleaned = cleaned.replace(match[0], '').trim();
+
+    if (actionType === 'ADD_GOAL') {
+      try {
+        const parsed = JSON.parse(payload);
+        if (parsed.name) {
+          onAddGoals([{
+            name: parsed.name,
+            description: parsed.description || 'Created via NEXUS AI chat',
+            category: parsed.category || 'smarts',
+            frequency: parsed.frequency || 'daily',
+            reminderTime: parsed.reminderTime || '08:30',
+            reminderEnabled: true,
+            basePoints: 5,
+            effects: [{ category: parsed.category || 'smarts', weight: 4 }],
+            isLifePathAligned: true,
+          }]);
+          actionTag = `⚡ Added Goal: "${parsed.name}"`;
+        }
+      } catch {
+        if (payload) {
+          onAddGoals([{
+            name: payload,
+            description: 'Created via NEXUS AI chat',
+            category: 'smarts',
+            frequency: 'daily',
+            reminderTime: '08:30',
+            reminderEnabled: true,
+            basePoints: 5,
+            effects: [{ category: 'smarts', weight: 4 }],
+            isLifePathAligned: true,
+          }]);
+          actionTag = `⚡ Added Goal: "${payload}"`;
+        }
+      }
+    } else if (actionType === 'COMPLETE_GOAL') {
+      const target = payload.toLowerCase();
+      const matchGoal = existingGoals.find(g =>
+        !g.archived && (
+          g.id === target ||
+          g.name.toLowerCase() === target ||
+          g.name.toLowerCase().includes(target) ||
+          target.includes(g.name.toLowerCase())
+        )
+      );
+      if (matchGoal && onToggleGoal) {
+        onToggleGoal(matchGoal.id);
+        actionTag = `⚡ Marked Complete: "${matchGoal.name}"`;
+      }
+    } else if (actionType === 'NAVIGATE') {
+      const tab = payload.toLowerCase();
+      if (onNavigateTab) {
+        onNavigateTab(tab);
+        actionTag = `⚡ Opened ${tab} view`;
+      }
+    } else if (actionType === 'ADD_JOURNAL') {
+      if (onSaveJournal) {
+        const today = new Date().toISOString().split('T')[0];
+        const nowIso = new Date().toISOString();
+        try {
+          const parsed = JSON.parse(payload);
+          onSaveJournal({
+            date: today,
+            entry: parsed.entry || payload,
+            mood: parsed.mood || 4,
+            updatedAt: nowIso,
+          });
+        } catch {
+          onSaveJournal({
+            date: today,
+            entry: payload,
+            mood: 4,
+            updatedAt: nowIso,
+          });
+        }
+        actionTag = `⚡ Journal Saved`;
+      }
+    }
+  }
+
+  return { cleanedText: cleaned, actionTag };
 }
 
 function offsetDate(dateStr: string, offsetDays: number): string {
@@ -96,6 +199,9 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
   userConfig,
   onUpdateUserConfig,
   onAddGoals,
+  onToggleGoal,
+  onNavigateTab,
+  onSaveJournal,
   existingGoals,
   dailyLogs,
   journals,
@@ -245,10 +351,20 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
           // Show typing indicator briefly between bubbles
           await new Promise<void>((resolve) => setTimeout(resolve, 700 + Math.random() * 700));
         }
+        const { cleanedText, actionTag } = parseAndExecuteAction(
+          bubbles[i],
+          existingGoals,
+          onAddGoals,
+          onToggleGoal,
+          onNavigateTab,
+          onSaveJournal
+        );
+        const bubbleText = actionTag ? `${cleanedText}\n\n[ ${actionTag} ]` : cleanedText;
+
         const bubble: AIChatMessage = {
           id: `ai-${Date.now()}-${i}`,
           sender: 'ai',
-          text: bubbles[i],
+          text: bubbleText,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
         runningMessages = [...runningMessages, bubble];
