@@ -28,7 +28,13 @@ async function startServer() {
   app.get('/api/health', (req, res) => {
     const provider = (process.env.AI_PROVIDER || 'groq').toLowerCase();
     const hasApiKey =
-      provider === 'groq' ? !!process.env.GROQ_API_KEY : !!process.env.OPENROUTER_API_KEY;
+      provider === 'groq'
+        ? !!process.env.GROQ_API_KEY
+        : provider === 'kilo' || provider === 'kilo_gateway'
+          ? !!process.env.KILO_API_KEY
+          : provider === 'nvidia' || provider === 'nvidia_nim'
+            ? !!process.env.NVIDIA_API_KEY
+            : !!process.env.OPENROUTER_API_KEY;
     res.json({
       status: 'ok',
       hasApiKey,

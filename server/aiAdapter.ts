@@ -208,7 +208,7 @@ export interface AIProvider {
   lapseRecovery(params: LapseRecoveryParams): Promise<{ message: string; adjustedPlan?: string }>;
 }
 
-type LlmBackend = 'openrouter' | 'groq' | 'kilo';
+type LlmBackend = 'openrouter' | 'groq' | 'kilo' | 'nvidia';
 
 type LlmContentPart =
   | { type: 'text'; text: string }
@@ -222,6 +222,7 @@ type LlmMessage = {
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const KILO_API_URL = 'https://api.kilo.ai/api/gateway/chat/completions';
+const NVIDIA_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
 function openRouterModel() {
   return process.env.OPENROUTER_MODEL || 'qwen/qwen3-235b-a22b';
@@ -253,21 +254,34 @@ function kiloVisionModel() {
   return process.env.KILO_VISION_MODEL || kiloModel();
 }
 
+function nvidiaModel() {
+  return process.env.NVIDIA_MODEL || 'deepseek-ai/deepseek-v4-pro-0813';
+}
+function nvidiaHighStakesModel() {
+  return process.env.NVIDIA_HIGHSTAKES_MODEL || nvidiaModel();
+}
+function nvidiaVisionModel() {
+  return process.env.NVIDIA_VISION_MODEL || nvidiaModel();
+}
+
 function defaultModelForBackend(backend: LlmBackend) {
   if (backend === 'groq') return groqModel();
   if (backend === 'kilo') return kiloModel();
+  if (backend === 'nvidia') return nvidiaModel();
   return openRouterModel();
 }
 
 function highStakesModelForBackend(backend: LlmBackend) {
   if (backend === 'groq') return groqHighStakesModel();
   if (backend === 'kilo') return kiloHighStakesModel();
+  if (backend === 'nvidia') return nvidiaHighStakesModel();
   return openRouterHighStakesModel();
 }
 
 function visionModelForBackend(backend: LlmBackend) {
   if (backend === 'groq') return groqVisionModel();
   if (backend === 'kilo') return kiloVisionModel();
+  if (backend === 'nvidia') return nvidiaVisionModel();
   return openRouterVisionModel();
 }
 
@@ -280,8 +294,9 @@ async function llmChat(options: {
 }): Promise<string> {
   const isGroq = options.backend === 'groq';
   const isKilo = options.backend === 'kilo';
-  const apiKey = isGroq ? process.env.GROQ_API_KEY : isKilo ? process.env.KILO_API_KEY : process.env.OPENROUTER_API_KEY;
-  const url = isGroq ? GROQ_API_URL : isKilo ? KILO_API_URL : OPENROUTER_API_URL;
+  const isNvidia = options.backend === 'nvidia';
+  const apiKey = isGroq ? process.env.GROQ_API_KEY : isKilo ? process.env.KILO_API_KEY : isNvidia ? process.env.NVIDIA_API_KEY : process.env.OPENROUTER_API_KEY;
+  const url = isGroq ? GROQ_API_URL : isKilo ? KILO_API_URL : isNvidia ? NVIDIA_API_URL : OPENROUTER_API_URL;
   const defaultModel = defaultModelForBackend(options.backend);
   const model = options.model || defaultModel;
 
@@ -295,6 +310,11 @@ async function llmChat(options: {
     temperature: options.temperature ?? 0.7,
   };
 
+  const maxTokens = Number(process.env.LLM_MAX_TOKENS || (isNvidia ? process.env.NVIDIA_MAX_TOKENS || 4096 : 0));
+  if (Number.isFinite(maxTokens) && maxTokens > 0) {
+    body.max_tokens = maxTokens;
+  }
+
   if (options.json) {
     body.response_format = { type: 'json_object' };
   }
@@ -304,7 +324,7 @@ async function llmChat(options: {
     Authorization: `Bearer ${apiKey}`,
   };
 
-  if (!isGroq && !isKilo) {
+  if (!isGroq && !isKilo && !isNvidia) {
     headers['HTTP-Referer'] = 'https://personal-growth-tracker.local';
     headers['X-Title'] = 'Personal Growth Tracker';
   }
@@ -753,13 +773,14 @@ export class LlmAIAdapter implements AIProvider {
 
   constructor(backend: LlmBackend = 'openrouter') {
     this.backend = backend;
-    this.name = backend === 'groq' ? 'Groq LPU Engine' : backend === 'kilo' ? 'Kilo Gateway AI Engine' : 'OpenRouter Unified AI Engine';
+    this.name = backend === 'groq' ? 'Groq LPU Engine' : backend === 'kilo' ? 'Kilo Gateway AI Engine' : backend === 'nvidia' ? 'NVIDIA NIM AI Engine' : 'OpenRouter Unified AI Engine';
   }
 
 
   private hasKey(): boolean {
     if (this.backend === 'groq') return !!process.env.GROQ_API_KEY;
     if (this.backend === 'kilo') return !!process.env.KILO_API_KEY;
+    if (this.backend === 'nvidia') return !!process.env.NVIDIA_API_KEY;
     return !!process.env.OPENROUTER_API_KEY;
   }
 
@@ -1294,6 +1315,12 @@ export class KiloAIAdapter extends LlmAIAdapter {
   }
 }
 
+export class NvidiaAIAdapter extends LlmAIAdapter {
+  constructor() {
+    super('nvidia');
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Offline Fallback Adapter
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1461,6 +1488,9 @@ export function getAIAdapter(): AIProvider {
     case 'kilo':
     case 'kilo_gateway':
       return new KiloAIAdapter();
+    case 'nvidia':
+    case 'nvidia_nim':
+      return new NvidiaAIAdapter();
     case 'fallback':
     case 'offline':
       return new FallbackAIAdapter();
