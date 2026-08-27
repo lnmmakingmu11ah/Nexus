@@ -208,7 +208,7 @@ export interface AIProvider {
   lapseRecovery(params: LapseRecoveryParams): Promise<{ message: string; adjustedPlan?: string }>;
 }
 
-type LlmBackend = 'openrouter' | 'groq';
+type LlmBackend = 'openrouter' | 'groq' | 'kilo';
 
 type LlmContentPart =
   | { type: 'text'; text: string }
@@ -221,6 +221,7 @@ type LlmMessage = {
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const KILO_API_URL = 'https://api.kilo.ai/api/gateway/chat/completions';
 
 function openRouterModel() {
   return process.env.OPENROUTER_MODEL || 'qwen/qwen3-235b-a22b';
@@ -242,16 +243,32 @@ function groqVisionModel() {
   return process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
 }
 
+function kiloModel() {
+  return process.env.KILO_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b';
+}
+function kiloHighStakesModel() {
+  return process.env.KILO_HIGHSTAKES_MODEL || kiloModel();
+}
+function kiloVisionModel() {
+  return process.env.KILO_VISION_MODEL || kiloModel();
+}
+
 function defaultModelForBackend(backend: LlmBackend) {
-  return backend === 'groq' ? groqModel() : openRouterModel();
+  if (backend === 'groq') return groqModel();
+  if (backend === 'kilo') return kiloModel();
+  return openRouterModel();
 }
 
 function highStakesModelForBackend(backend: LlmBackend) {
-  return backend === 'groq' ? groqHighStakesModel() : openRouterHighStakesModel();
+  if (backend === 'groq') return groqHighStakesModel();
+  if (backend === 'kilo') return kiloHighStakesModel();
+  return openRouterHighStakesModel();
 }
 
 function visionModelForBackend(backend: LlmBackend) {
-  return backend === 'groq' ? groqVisionModel() : openRouterVisionModel();
+  if (backend === 'groq') return groqVisionModel();
+  if (backend === 'kilo') return kiloVisionModel();
+  return openRouterVisionModel();
 }
 
 async function llmChat(options: {
@@ -262,8 +279,9 @@ async function llmChat(options: {
   json?: boolean;
 }): Promise<string> {
   const isGroq = options.backend === 'groq';
-  const apiKey = isGroq ? process.env.GROQ_API_KEY : process.env.OPENROUTER_API_KEY;
-  const url = isGroq ? GROQ_API_URL : OPENROUTER_API_URL;
+  const isKilo = options.backend === 'kilo';
+  const apiKey = isGroq ? process.env.GROQ_API_KEY : isKilo ? process.env.KILO_API_KEY : process.env.OPENROUTER_API_KEY;
+  const url = isGroq ? GROQ_API_URL : isKilo ? KILO_API_URL : OPENROUTER_API_URL;
   const defaultModel = defaultModelForBackend(options.backend);
   const model = options.model || defaultModel;
 
@@ -286,9 +304,13 @@ async function llmChat(options: {
     Authorization: `Bearer ${apiKey}`,
   };
 
-  if (!isGroq) {
+  if (!isGroq && !isKilo) {
     headers['HTTP-Referer'] = 'https://personal-growth-tracker.local';
     headers['X-Title'] = 'Personal Growth Tracker';
+  }
+
+  if (isKilo) {
+    headers['x-kilocode-mode'] = 'plan';
   }
 
   try {
@@ -673,13 +695,15 @@ ${
   stage === 'onboarding'
     ? `GOAL SCOUT CONVERSATION (Discovery Phase):
 Your goal is to genuinely understand who this person is, their real ambitions, and what holds them back, then gather enough detail to build a life-goal portfolio.
-One question at a time! Keep it natural and casual.
+One question at a time. Keep it natural and casual, like a curious friend gradually learning them.
 
 Portfolio depth rules:
 - Do not accept a broad goal at face value. If they say "get fit", "be rich", "study more", or "be better", gently press for the real version.
 - For every important goal, eventually learn: current level, target level, why it matters, timeline, past attempts, likely blockers, weekly capacity, success proof, and how it connects to other goals.
 - Ask indirect questions sometimes. Example: "what would make this goal embarrassing to fail at, not to be dramatic but kinda yes 😂"
-- Keep the interview conversational. One question at a time, but remember unfinished threads and circle back.
+- Keep the interview conversational. Ask at most one direct question per reply. If you need multiple details, pick the most important missing detail now and remember the rest for later.
+- Mix questions with reflection: react to what they said, name what you understood, then ask the next small question.
+- Avoid numbered question lists unless the user explicitly asks for a checklist. Never ask 3+ questions in one message during Goal Scout.
 
 Flow:
 1. Greet them and find out their name.
@@ -691,6 +715,7 @@ Flow:
 RULES:
 - Do NOT build the plan or list schedules inside the chat yet. The plan is built in the background AFTER discovery.
 - Be supportive, honest, a little playful, and real. If they give vague answers, tease lightly and ask for the concrete version.
+- Do not rush to planning. Build a quiet mental checklist of missing details: name, identity, goals, current level, target, why, timeline, past attempts, blockers, weekly capacity, proof, dependencies, and conflicts. Ask for them over several turns.
 - When you have thoroughly gathered their name, goals, whys, setbacks, and capacity, ask if they are ready for you to build their plan in the background.
 - When they confirm they are ready, end your message with this token on its own last line:
 <<READY_FOR_PLAN>>`
@@ -728,12 +753,14 @@ export class LlmAIAdapter implements AIProvider {
 
   constructor(backend: LlmBackend = 'openrouter') {
     this.backend = backend;
-    this.name = backend === 'groq' ? 'Groq LPU Engine' : 'OpenRouter Unified AI Engine';
+    this.name = backend === 'groq' ? 'Groq LPU Engine' : backend === 'kilo' ? 'Kilo Gateway AI Engine' : 'OpenRouter Unified AI Engine';
   }
 
 
   private hasKey(): boolean {
-    return this.backend === 'groq' ? !!process.env.GROQ_API_KEY : !!process.env.OPENROUTER_API_KEY;
+    if (this.backend === 'groq') return !!process.env.GROQ_API_KEY;
+    if (this.backend === 'kilo') return !!process.env.KILO_API_KEY;
+    return !!process.env.OPENROUTER_API_KEY;
   }
 
   async onboardingReflect(params: OnboardingParams) {
@@ -1076,13 +1103,13 @@ Return JSON:
       discovery: `You are NEXUS in goal discovery mode. Learn what this person genuinely wants to achieve — one question at a time. When you have 1+ real goals clearly stated, ask if there are more. When all goals are shared, end with <<READY_FOR_FEASIBILITY>>.`,
       disambiguation: `You are NEXUS clarifying a vague goal. Ask ONE targeted follow-up on what success looks like specifically. When concrete, end with <<READY_FOR_FEASIBILITY>>.`,
       feasibility: `You are NEXUS running feasibility on stated goals. Be honest and direct. If a timeline is unrealistic, say so clearly with a reason and a realistic alternative.`,
-      willpower_check: `You are NEXUS testing real commitment. Ask 3 specific probing questions: what they will sacrifice, what past attempts looked like, and what is different this time.`,
+      willpower_check: `You are NEXUS testing real commitment without sounding like a form. Ask one probing question at a time, starting with the most important missing piece: sacrifice, past attempts, or what is different this time.`,
       confirmed: `Goals confirmed. Wrap up warmly and let them know the plan is being built in the background.`,
     };
 
     const system = `${phaseInstructions[params.intakePhase] || phaseInstructions.discovery}
 
-Casual texting tone — supportive friend on their phone with natural face emojis.
+Casual texting tone — supportive friend on their phone with natural face emojis. No big question lists; one clean question per turn unless the user asks for a list.
 User: ${params.userName || 'friend'}
 Goals so far: ${JSON.stringify(params.collectedGoals?.slice(0, 5) || [])}
 Constraints: ${JSON.stringify(params.constraints || {})}
@@ -1261,6 +1288,12 @@ export class OpenRouterAIAdapter extends LlmAIAdapter {
   }
 }
 
+export class KiloAIAdapter extends LlmAIAdapter {
+  constructor() {
+    super('kilo');
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Offline Fallback Adapter
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1425,6 +1458,9 @@ export function getAIAdapter(): AIProvider {
       return new GroqAIAdapter();
     case 'openrouter':
       return new OpenRouterAIAdapter();
+    case 'kilo':
+    case 'kilo_gateway':
+      return new KiloAIAdapter();
     case 'fallback':
     case 'offline':
       return new FallbackAIAdapter();
