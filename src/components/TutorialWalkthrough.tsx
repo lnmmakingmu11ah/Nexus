@@ -208,6 +208,25 @@ export const TutorialWalkthrough: React.FC<TutorialWalkthroughProps> = ({
   const [step, setStep] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
+  const [escapeAttempts, setEscapeAttempts] = useState(0);
+  const [showEscapeMsg, setShowEscapeMsg] = useState(false);
+
+  const ESCAPE_MSGS = [
+    "nope 😂 sit down and read it, it takes 60 seconds",
+    "bro where are you going 💀 you just installed the app",
+    "the X button is a lie. read the slides.",
+    "okay you've now pressed X twice. the irony is this took longer than just reading it 😭",
+    "we see you. NEXUS sees you. read. the. tutorial. 🙃",
+    "at this point ur just training us to make the button disappear 😤",
+    "fine. you win. but u still gotta read it. 💀",
+  ];
+
+  const handleEscapeAttempt = () => {
+    const msg = ESCAPE_MSGS[Math.min(escapeAttempts, ESCAPE_MSGS.length - 1)];
+    setEscapeAttempts((prev) => prev + 1);
+    setShowEscapeMsg(true);
+    setTimeout(() => setShowEscapeMsg(false), 2800);
+  };
 
   const slide = SLIDES[step];
   const accent = ACCENT_STYLES[slide.accentColor] || ACCENT_STYLES.amber;
@@ -253,10 +272,20 @@ export const TutorialWalkthrough: React.FC<TutorialWalkthroughProps> = ({
           className={`absolute inset-0 bg-gradient-to-br ${slide.gradientFrom} ${slide.gradientTo} pointer-events-none opacity-60`}
         />
 
-        {/* Skip button */}
+        {/* Escape joke toast */}
+        {showEscapeMsg && (
+          <div className="absolute top-0 left-0 right-0 z-20 bg-red-900/90 border-b border-red-500/40 px-4 py-3 text-center animate-pulse">
+            <p className="text-red-200 text-xs font-semibold">
+              {ESCAPE_MSGS[Math.min(escapeAttempts - 1, ESCAPE_MSGS.length - 1)]}
+            </p>
+          </div>
+        )}
+
+        {/* Skip button — stays broken on purpose, shows funny msg instead */}
         <button
-          onClick={() => { if (onNavigateTab) onNavigateTab('dashboard'); onComplete(); }}
-          className="absolute top-4 right-4 z-10 text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded-lg hover:bg-zinc-800"
+          onClick={handleEscapeAttempt}
+          className="absolute top-4 right-4 z-10 text-zinc-500 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-zinc-800"
+          title="lol nice try"
         >
           <X className="w-4 h-4" />
         </button>

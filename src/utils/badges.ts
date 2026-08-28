@@ -1,4 +1,4 @@
-import { DailyGoalLog, DailyJournal, Goal, UserConfig } from '../types';
+import { CategoryKey, DailyGoalLog, DailyJournal, Goal, UserConfig } from '../types';
 
 export interface BadgeDefinition {
   id: string;
@@ -442,7 +442,76 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     color: 'from-emerald-400 to-teal-500',
     requirementText: 'Log check-ins across 5 consecutive days',
   },
+  // ── NEW: Streak Milestone Badges ─────────────────────────────────────────
+  {
+    id: 'streak_3',
+    name: 'Warm Up',
+    description: 'Hit a 3-day habit streak — the hardest part is starting',
+    icon: '⚡',
+    color: 'from-yellow-300 to-amber-500',
+    requirementText: 'Reach a 3-day streak on any goal',
+  },
+  {
+    id: 'streak_5',
+    name: 'Momentum',
+    description: 'Five days straight — you\'re officially building a habit',
+    icon: '🏃',
+    color: 'from-orange-400 to-red-500',
+    requirementText: 'Reach a 5-day streak on any goal',
+  },
+  {
+    id: 'streak_60',
+    name: '60-Day Titan',
+    description: 'Two months of unbroken discipline. You are a different person now.',
+    icon: '🦁',
+    color: 'from-rose-500 to-pink-700',
+    requirementText: 'Reach a 60-day streak on any goal',
+  },
+  {
+    id: 'streak_100',
+    name: 'The Centurion',
+    description: '100 days. No excuses. Just you and the grind.',
+    icon: '💎',
+    color: 'from-cyan-400 to-blue-600',
+    requirementText: 'Reach a 100-day streak on any goal',
+  },
+  // ── NEW: Level Badges ────────────────────────────────────────────────────
+  {
+    id: 'level_5',
+    name: 'Rising',
+    description: 'Reached NEXUS Level 5 — you\'re officially in your arc',
+    icon: '⬆️',
+    color: 'from-sky-400 to-blue-500',
+    requirementText: 'Reach NEXUS Level 5',
+  },
+  {
+    id: 'level_10',
+    name: 'Ascendant',
+    description: 'Level 10: NEXUS Legend status unlocked. You\'re built different.',
+    icon: '🌟',
+    color: 'from-amber-400 to-yellow-300',
+    requirementText: 'Reach NEXUS Level 10',
+  },
+  // ── NEW: 5-Pillar Completionist Badge ────────────────────────────────────
+  {
+    id: 'all_5_pillars',
+    name: 'Renaissance',
+    description: 'Active goals in all 5 life pillars: Health, Smarts, Self-Care, Happiness & Spiritual',
+    icon: '🌍',
+    color: 'from-emerald-400 via-cyan-400 to-purple-500',
+    requirementText: 'Have at least 1 active goal in each of the 5 life pillars',
+  },
+  // ── NEW: Daily Sweep Hat-Trick ───────────────────────────────────────────
+  {
+    id: 'daily_sweep_3',
+    name: 'Perfect Hat-Trick',
+    description: 'Completed all daily goals on 3 separate days — consistency is your superpower',
+    icon: '🎩',
+    color: 'from-violet-400 to-fuchsia-600',
+    requirementText: 'Complete a full daily sweep 3 different times',
+  },
 ];
+
 
 export function evaluateBadges(
   goals: Goal[],
@@ -742,6 +811,56 @@ export function evaluateBadges(
     });
     if (uniqueDays.size >= 5) {
       currentUnlocked.add('momentum_builder');
+      newlyUnlockedCount++;
+    }
+  }
+
+  // ── NEW: Streak Milestones (3, 5, 60, 100) ─────────────────────────────
+  if (!currentUnlocked.has('streak_3') && maxGoalCompletions >= 3) {
+    currentUnlocked.add('streak_3');
+    newlyUnlockedCount++;
+  }
+  if (!currentUnlocked.has('streak_5') && maxGoalCompletions >= 5) {
+    currentUnlocked.add('streak_5');
+    newlyUnlockedCount++;
+  }
+  if (!currentUnlocked.has('streak_60') && maxGoalCompletions >= 60) {
+    currentUnlocked.add('streak_60');
+    newlyUnlockedCount++;
+  }
+  if (!currentUnlocked.has('streak_100') && maxGoalCompletions >= 100) {
+    currentUnlocked.add('streak_100');
+    newlyUnlockedCount++;
+  }
+
+  // ── NEW: Level Badges (requires XP calculation) ─────────────────────────
+  const xpEarned = dailyLogs.filter((l) => l.completed).length * 5; // rough XP estimate for badge gating
+  if (!currentUnlocked.has('level_5') && xpEarned >= 500) {
+    currentUnlocked.add('level_5');
+    newlyUnlockedCount++;
+  }
+  if (!currentUnlocked.has('level_10') && xpEarned >= 2000) {
+    currentUnlocked.add('level_10');
+    newlyUnlockedCount++;
+  }
+
+  // ── NEW: All 5 Pillars (Renaissance) ────────────────────────────────────
+  if (!currentUnlocked.has('all_5_pillars')) {
+    const PILLARS: CategoryKey[] = ['health', 'smarts', 'selfCare', 'happiness', 'spiritual'];
+    const activeGoalCategories = new Set(goals.filter((g) => !g.archived).map((g) => g.category));
+    if (PILLARS.every((p) => activeGoalCategories.has(p))) {
+      currentUnlocked.add('all_5_pillars');
+      newlyUnlockedCount++;
+    }
+  }
+
+  // ── NEW: Daily Sweep Hat-Trick ────────────────────────────────────────────
+  if (!currentUnlocked.has('daily_sweep_3') && activeDailyGoalIds.length > 0) {
+    const sweepDays = Object.values(completedLogsByDate).filter((goalIds) =>
+      activeDailyGoalIds.every((goalId) => goalIds.has(goalId))
+    ).length;
+    if (sweepDays >= 3) {
+      currentUnlocked.add('daily_sweep_3');
       newlyUnlockedCount++;
     }
   }

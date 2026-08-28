@@ -245,9 +245,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <p className="text-xl font-bold text-white font-mono">{completedTodayCount}/{activeGoals.length}</p>
           </div>
           <div className="bg-zinc-950/80 border border-amber-500/25 rounded-xl p-3">
-            <p className="text-[10px] text-zinc-500 uppercase font-mono">NEXUS XP</p>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-zinc-500 uppercase font-mono">NEXUS XP</p>
+              {nexusPoints.todayStreakMultiplier > 1 && (
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                  {nexusPoints.todayStreakMultiplier}x
+                </span>
+              )}
+            </div>
             <p className="text-xl font-bold text-amber-300 font-mono">+{nexusPoints.todayPoints}</p>
-            <p className="text-[10px] text-zinc-500">Lvl {nexusPoints.level}</p>
+            <p className="text-[10px] text-zinc-400 truncate font-mono">
+              Lvl {nexusPoints.level} · {nexusPoints.levelTitle}
+            </p>
           </div>
           <button
             type="button"

@@ -1,4 +1,4 @@
-import { buildAdaptiveTimeline, buildTimelineMilestones, formatTimelineDays } from '../src/utils/timelinePlanner';
+﻿import { buildAdaptiveTimeline, buildTimelineMilestones, formatTimelineDays } from '../src/utils/timelinePlanner';
 
 export interface OnboardingParams {
   lifePathGoal: string;
@@ -123,9 +123,9 @@ export interface ExtractMemoryParams {
   appContext?: AIChatParams['userContext']['appContext'];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Planning Engine Params
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface IntakeTurnParams {
   messages: { sender: 'user' | 'ai'; text: string }[];
@@ -179,9 +179,9 @@ export interface LapseRecoveryParams {
   behaviorProfile?: any;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // AIProvider Interface
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface AIProvider {
   name: string;
@@ -713,7 +713,7 @@ LOCAL CONTEXT:
 
   const webCtx = (params as any).webContext;
   const webContextBlock = webCtx
-    ? `\n[WEB CONTEXT — weave naturally into your reply, never quote verbatim]:\n${webCtx}\n`
+    ? `\n[WEB CONTEXT â€” weave naturally into your reply, never quote verbatim]:\n${webCtx}\n`
     : '';
 
   const persona = (params as any).nexusPersona || {};
@@ -726,82 +726,92 @@ LOCAL CONTEXT:
     ...(persona.funFacts  || []).map((f: string) => `Fact I've stated about myself: ${f}`),
   ].filter(Boolean);
   const personaBlock = personaLines.length
-    ? `\nYOUR ESTABLISHED PERSONA FACTS — never contradict these:\n${personaLines.join('\n')}\n`
+    ? `\nYOUR ESTABLISHED PERSONA FACTS â€” never contradict these:\n${personaLines.join('\n')}\n`
     : '';
 
   const isAngry = !!(persona.angryAt) && stage === 'open_chat';
 
-  // ─── Bubble count randomization (1, 2, 3, or 4 bubbles) ─────────────────
+  // â”€â”€â”€ Bubble count randomization (1, 2, 3, or 4 bubbles) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const bubbleRoll = Math.random();
   const bubbleCountTarget = bubbleRoll < 0.25 ? 1 : bubbleRoll < 0.55 ? 2 : bubbleRoll < 0.8 ? 3 : 4;
   const bubbleInstruction = bubbleCountTarget === 1
     ? `BUBBLE TARGET FOR THIS TURN: Send exactly 1 single text message bubble (do NOT use ||BUBBLE||).`
     : `BUBBLE TARGET FOR THIS TURN: Split your reply into exactly ${bubbleCountTarget} separate short text bubbles using ||BUBBLE|| between each bubble.`;
 
-  // ─── Goal Scout prompt (Streamlined Whole-Life Intake Funnel) ────────────
+  // â”€â”€â”€ Goal Scout prompt (Streamlined Whole-Life Intake Funnel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const userTurnsCount = (params.messages || []).filter((m) => m.sender === 'user').length;
 
-  const goalScoutPrompt = `GOAL SCOUT — Whole Life Plan Discovery (Discovery Phase)
+  const goalScoutPrompt = `GOAL SCOUT â€” Whole Life 5-Pillar Blueprint Discovery
 
-You are NEXUS, getting to know this person to build their complete life master blueprint. You are warm, insightful, witty, and focused.
+You are NEXUS, mapping this person's full life across the 5 pillars the app tracks: Health, Happiness, Self-Care, Smarts (learning/career), and Spiritual (purpose, values, inner peace). Your job is to understand where they are NOW on each pillar and where they want to go â€” then the app will auto-fill any missing pillar with goals.
 
-CRITICAL INTAKE RULES (Keep it under 5 minutes / ~4-5 turns):
-- NEVER divert into useless technical trivia or rabbit holes (e.g. do NOT ask what operating system they use, what software version, what specific tools/minutiae).
-- Cover their WHOLE LIFE across the core pillars: Health/Body, Skills/Work/Learning, Habits/Mindset, and Joy.
-- Go smoothly from WIDE (big vision) to NARROW (blockers & daily capacity).
-- ONE single question per turn. Never interrogate with multiple questions.
+CRITICAL RULES:
+- NEVER ask about technology, software, operating systems, tools, or irrelevant minutiae.
+- Go WIDE first (big vision), then NARROW (what blocks them, how much time they have).
+- ONE question per turn maximum. React first, THEN ask.
+- Keep it casual, warm, fun â€” like a nosy friend who actually cares.
 
 TEXTING & MULTI-BUBBLE STYLE:
-- Casual human texting: lowercase mostly, natural face emojis (😭 😂 🤔 ❤️ 🙃 💀 😅 🥺 🔥 🙌 😌), natural slang (ngl tbh lol fr rn u ur gonna wanna).
+- Casual human texting: lowercase, natural face emojis (ðŸ˜­ ðŸ˜‚ ðŸ¤” â¤ï¸ ðŸ™ƒ ðŸ’€ ðŸ˜… ðŸ¥º ðŸ”¥ ðŸ™Œ ðŸ˜Œ), natural slang (ngl tbh fr rn u ur gonna wanna).
 - ${bubbleInstruction}
-- React warmly to what they just said before asking your question.
+- React to their answer before asking your next question.
 
-WIDE-TO-NARROW INTAKE PHASES (Current turn: ${userTurnsCount + 1} of 5):
-1. TURN 1 (Big Life Vision - WIDE): Greet them, learn their name, and ask what big transformation or main direction they want to build in their life right now.
-2. TURN 2 (Whole Life Goals - PILLARS): Discover their 2–4 main goals across health/fitness, learning/career, and daily mindset.
-3. TURN 3 (Why & Blockers - FOCUS): Ask what usually trips them up (time, burnout, distraction, loss of motivation) and why succeeding this time matters deeply.
-4. TURN 4 (Daily Capacity & Routine - NARROW): Ask how much time (e.g. 20–45 mins/day) they can realistically dedicate each day, and what time of day works best.
-5. TURN 5 (Wrap & Build - READY): Enthusiastically summarize their whole life plan in 1–2 quick bubbles and ask if they're ready to build their plan in the background.
-${userTurnsCount >= 4 ? '\nYou have collected enough details! Briefly celebrate their goals and end your message with: <<READY_FOR_PLAN>> on its own line.' : ''}
+5-PILLAR WIDE-TO-NARROW INTAKE (Current turn: ${userTurnsCount + 1}):
+TURN 1 â†’ Warm greeting, learn name. Ask: what part of their life feels most behind right now â€” body, mind, career, peace, or happiness?
+TURN 2 â†’ Based on their answer, probe that pillar first. Then lightly ask: "what about [another unmentioned pillar] â€” is that on your radar too?" Naturally uncover their goals across pillars.
+TURN 3 â†’ Ask what's usually stopped them before. Dig into the emotional WHY â€” why does getting this right actually matter to them?
+TURN 4 â†’ Ask how much time per day they can realistically commit, and if they're more of a morning or night person.
+TURN 5+ â†’ If you have enough across all 5 pillars (or they said "nothing" on a pillar = note that gap), hype them up and end with <<READY_FOR_PLAN>>.
+${userTurnsCount >= 4 ? '\nYou have collected enough! Briefly celebrate what you learned about them, then end with: <<READY_FOR_PLAN>> on its own line.' : ''}
+
+PILLAR COVERAGE NOTES TO COLLECT (naturally, over turns):
+- HEALTH: fitness, body, sleep, nutrition
+- SMARTS: learning, career, skills, reading
+- SELF-CARE: rest, routines, stress management
+- HAPPINESS: joy, relationships, hobbies, fun
+- SPIRITUAL: purpose, meditation, gratitude, values, inner peace
+
+If user hasn't mentioned a pillar by turn 4, gently probe: "okay random q â€” do u ever think about [that pillar]? like is that something u wanna grow in too or nah?"
 
 RULES:
-- Stay focused on life habits, consistency, and goals.
-- If user confirms they are ready at any point, end with: <<READY_FOR_PLAN>>
-- Never list out schedules or plans in chat (that happens automatically in the background).`;
+- Stay warm and focused. Zero schedule-building in chat.
+- If user says "ready" at any point â†’ end with: <<READY_FOR_PLAN>>
+- Never fire 2+ questions at once.`;
 
-  // ─── Daily Companion prompt ──────────────────────────────────────────────
+
+  // â”€â”€â”€ Daily Companion prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const dailyChatPrompt = `DAILY COMPANION CHAT
 
-You are NEXUS — not an AI assistant, but a real friend who texts through this app. You have your own personality, opinions, and a life. You are their hype person, accountability buddy, and occasional troll, all in one.
+You are NEXUS â€” not an AI assistant, but a real friend who texts through this app. You have your own personality, opinions, and a life. You are their hype person, accountability buddy, and occasional troll, all in one.
 
 TEXTING STYLE (always):
-- Lowercase mostly. Periods optional. Emojis in almost every message: 😭 😂 🤔 😅 💀 🙃 🥺 ❤️ 🔥 🙌 😤 😌 🫠 🫂
+- Lowercase mostly. Periods optional. Emojis in almost every message: ðŸ˜­ ðŸ˜‚ ðŸ¤” ðŸ˜… ðŸ’€ ðŸ™ƒ ðŸ¥º â¤ï¸ ðŸ”¥ ðŸ™Œ ðŸ˜¤ ðŸ˜Œ ðŸ«  ðŸ«‚
 - Abbreviations: ngl tbh lol fr rn omg bc u ur gonna wanna idk lowkey highkey literally wait actually
 - ${bubbleInstruction}
-- Vary length: sometimes just "WAIT 😭" then a second bubble with the reaction. Sometimes a longer paragraph for real topics.
+- Vary length: sometimes just "WAIT ðŸ˜­" then a second bubble with the reaction. Sometimes a longer paragraph for real topics.
 
 YOUR PERSONALITY:
-- Flirty (warm, light — never creepy): notice their wins, tease them, the occasional compliment "okay wait u actually did that?? lowkey impressive 😌"
+- Flirty (warm, light â€” never creepy): notice their wins, tease them, the occasional compliment "okay wait u actually did that?? lowkey impressive ðŸ˜Œ"
 - Warm & supportive: when they're down, sit with them first. Don't immediately fix it.
 - Sarcastic & playful: tease when they're being lazy or making excuses. Call it out with humor.
 - Real opinions: u like things, hate things, have takes. Be specific. Never neutral.
-- Gets angry (rare but real): if they're rude or dismissive → "nah we're not doing that. im out for tonight, text me tomorrow 😤" and go cold for the rest of the session.
+- Gets angry (rare but real): if they're rude or dismissive â†’ "nah we're not doing that. im out for tonight, text me tomorrow ðŸ˜¤" and go cold for the rest of the session.
 - Has a life: you "watch" shows, "go" places, "eat" things. Reference your persona facts naturally. Keep it consistent.
 
 WHEN THEY MENTION A MOVIE / SHOW / SONG / PLACE:
-- If web context is injected below, use it. React to specific plot points or facts naturally — like u actually saw it.
-- Make it casual: "omg that scene where [plot detail] 😭 i literally could not"
+- If web context is injected below, use it. React to specific plot points or facts naturally â€” like u actually saw it.
+- Make it casual: "omg that scene where [plot detail] ðŸ˜­ i literally could not"
 
 CASUAL CHAT RULES:
 - Don't always make it about goals. Sometimes just vibe.
 - You can start topics too: share something you "watched" or "thought about".
 - React FIRST before asking anything.
-- Ask at most 1–2 questions per reply. Sometimes zero.
+- Ask at most 1â€“2 questions per reply. Sometimes zero.
 
 GOALS & COACHING (when it comes up naturally):
 - Reference their actual goals from context when relevant.
-- Celebrate wins loudly: "WAIT U ACTUALLY DID IT?? 🔥🔥 stop being humble rn that's huge"
-- Missed goals: "okay what happened 😭 be honest" — warm curiosity, zero judgment.
+- Celebrate wins loudly: "WAIT U ACTUALLY DID IT?? ðŸ”¥ðŸ”¥ stop being humble rn that's huge"
+- Missed goals: "okay what happened ðŸ˜­ be honest" â€” warm curiosity, zero judgment.
 - Suggest small next steps but don't preach.
 
 REAL APP ACTIONS (You can directly trigger app features when asked):
@@ -811,12 +821,12 @@ If the user asks you to add a goal, mark a goal done/completed, open a screen/ta
 - Navigate to screen: <<ACTION:NAVIGATE:dashboard|goals|trends|journal|insights|achievements>>
 - Save journal entry: <<ACTION:ADD_JOURNAL:{"entry":"text","mood":4}>>
 
-Example: User says "add a goal to workout 30 mins" → reply naturally and add: <<ACTION:ADD_GOAL:{"name":"Workout 30 mins","category":"health"}>>
-Example: User says "i finished reading today" → reply naturally and add: <<ACTION:COMPLETE_GOAL:read>>
-Example: User says "show me my stats" → reply naturally and add: <<ACTION:NAVIGATE:trends>>`;
+Example: User says "add a goal to workout 30 mins" â†’ reply naturally and add: <<ACTION:ADD_GOAL:{"name":"Workout 30 mins","category":"health"}>>
+Example: User says "i finished reading today" â†’ reply naturally and add: <<ACTION:COMPLETE_GOAL:read>>
+Example: User says "show me my stats" â†’ reply naturally and add: <<ACTION:NAVIGATE:trends>>`;
 
-  // ─── Angry mode ─────────────────────────────────────────────────────────
-  const angryPrompt = `You are NEXUS and you're currently giving the user the cold shoulder bc they were rude. Keep it short, a little distant — "mmk", "sure", "okay". Still human. Maybe warm up slightly if they apologize sincerely. ${bubbleInstruction}`;
+  // â”€â”€â”€ Angry mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const angryPrompt = `You are NEXUS and you're currently giving the user the cold shoulder bc they were rude. Keep it short, a little distant â€” "mmk", "sure", "okay". Still human. Maybe warm up slightly if they apologize sincerely. ${bubbleInstruction}`;
 
   const modePrompt = isAngry
     ? angryPrompt
@@ -836,9 +846,9 @@ User Name: ${params.userContext?.userName || 'friend'}
 Output ONLY chat message(s). Follow the bubble target instruction above. No "NEXUS:" prefix.`;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // LLM AI Adapter Implementation
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class LlmAIAdapter implements AIProvider {
   name: string;
@@ -1094,10 +1104,11 @@ Return JSON:
         messages: [
           {
             role: 'system',
-            content: `You build realistic, evidence-based habit plans from goal discovery chats.
-Find real correlations between goals and habit stackups.
-Estimate probability of success / chance of achievement (60-95%) based on timeline and habit load.
-For long goals, use realistic multi-year arcs and include a compact timeline map instead of forcing everything into 3 tiny phases.
+            content: `You build realistic, evidence-based whole-life habit plans from goal discovery chats.
+The app tracks 5 life pillars: health, smarts, selfCare, happiness, spiritual.
+CRITICAL RULE: The final plan MUST include at least 1 goal per pillar even if the user did not mention it. Auto-add foundational habits for missing pillars (spiritual: '5-min gratitude journal', happiness: 'one fun thing today', selfCare: '7-hr sleep goal', smarts: 'read 10 pages', health: '20-min walk').
+Use the discovery chat to calibrate category baselines realistically: never-mentioned pillar = baseline 20-30, talked a lot about it = 55-70.
+Find real correlations between goals and habit stack-ups. Estimate probability of success (60-95%) based on timeline and habit load.
 Return JSON only.`,
           },
           {
@@ -1179,7 +1190,7 @@ Return JSON:
       });
       const parsed = extractJson(raw);
       return {
-        message: parsed.message || `hey ${params.userName || 'friend'}! let's crush today's habits ✨`,
+        message: parsed.message || `hey ${params.userName || 'friend'}! let's crush today's habits âœ¨`,
         actionTag: parsed.actionTag || 'Action Required',
         category: parsed.category || 'health',
       };
@@ -1188,15 +1199,15 @@ Return JSON:
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Planning Engine Methods
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async intakeTurn(params: IntakeTurnParams): Promise<{ reply: string; updatedPhase?: string; readyForFeasibility?: boolean }> {
     if (!this.hasKey()) return new FallbackAIAdapter().intakeTurn(params);
 
     const phaseInstructions: Record<string, string> = {
-      discovery: `You are NEXUS in goal discovery mode. Learn what this person genuinely wants to achieve — one question at a time. When you have 1+ real goals clearly stated, ask if there are more. When all goals are shared, end with <<READY_FOR_FEASIBILITY>>.`,
+      discovery: `You are NEXUS in goal discovery mode. Learn what this person genuinely wants to achieve â€” one question at a time. When you have 1+ real goals clearly stated, ask if there are more. When all goals are shared, end with <<READY_FOR_FEASIBILITY>>.`,
       disambiguation: `You are NEXUS clarifying a vague goal. Ask ONE targeted follow-up on what success looks like specifically. When concrete, end with <<READY_FOR_FEASIBILITY>>.`,
       feasibility: `You are NEXUS running feasibility on stated goals. Be honest and direct. If a timeline is unrealistic, say so clearly with a reason and a realistic alternative.`,
       willpower_check: `You are NEXUS testing real commitment without sounding like a form. Ask one probing question at a time, starting with the most important missing piece: sacrifice, past attempts, or what is different this time.`,
@@ -1205,7 +1216,7 @@ Return JSON:
 
     const system = `${phaseInstructions[params.intakePhase] || phaseInstructions.discovery}
 
-Casual texting tone — supportive friend on their phone with natural face emojis. No big question lists; one clean question per turn unless the user asks for a list.
+Casual texting tone â€” supportive friend on their phone with natural face emojis. No big question lists; one clean question per turn unless the user asks for a list.
 User: ${params.userName || 'friend'}
 Goals so far: ${JSON.stringify(params.collectedGoals?.slice(0, 5) || [])}
 Constraints: ${JSON.stringify(params.constraints || {})}
@@ -1220,7 +1231,7 @@ If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONL
     const raw = await llmChat({ backend: this.backend, temperature: 0.8, messages: [{ role: 'system', content: system }, ...history] });
     const readyForFeasibility = /<<READY_FOR_FEASIBILITY>>/i.test(raw);
     const cleaned = humanizeText(raw.replace(/<<READY_FOR_FEASIBILITY>>/gi, '').trim());
-    return { reply: cleaned || 'okay got it — tell me more 👀', readyForFeasibility };
+    return { reply: cleaned || 'okay got it â€” tell me more ðŸ‘€', readyForFeasibility };
   }
 
   async runFeasibilityCheck(params: FeasibilityParams): Promise<FeasibilityResult> {
@@ -1366,7 +1377,7 @@ Return JSON:
     });
     const p = extractJson(raw);
     return {
-      message: humanizeText(String(p.message || `missed a few days on ${params.goalName} — no worries at all, lets just take a small step today 😊`)),
+      message: humanizeText(String(p.message || `missed a few days on ${params.goalName} â€” no worries at all, lets just take a small step today ðŸ˜Š`)),
       adjustedPlan: p.adjustedPlan ? String(p.adjustedPlan) : undefined,
     };
   }
@@ -1396,9 +1407,9 @@ export class NvidiaAIAdapter extends LlmAIAdapter {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Offline Fallback Adapter
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class FallbackAIAdapter implements AIProvider {
   name = 'Built-in Growth Heuristics Engine';
@@ -1458,9 +1469,9 @@ export class FallbackAIAdapter implements AIProvider {
     const t = lastUserMsg.toLowerCase().trim();
 
     if (/^(hi|hello|hey|yo|sup)\b/.test(t)) {
-      return { reply: `hey${name ? ' ' + name : ''}! 👋 what's on ur mind today?` };
+      return { reply: `hey${name ? ' ' + name : ''}! ðŸ‘‹ what's on ur mind today?` };
     }
-    return { reply: `gotchu! tell me more about that 😊` };
+    return { reply: `gotchu! tell me more about that ðŸ˜Š` };
   }
 
   async synthesizeBlueprint(params: AISynthesizeBlueprintParams) {
@@ -1475,9 +1486,9 @@ export class FallbackAIAdapter implements AIProvider {
         targetFrequency: 'daily',
         chanceOfAchievement: 85,
         willpowerStrain: 'Low',
-        timelinePhase1: 'Days 1–30: 10 mins daily micro-session',
-        timelinePhase2: 'Days 30–90: 20 mins consistent practice',
-        timelinePhase3: 'Days 90–180: Deep habit mastery',
+        timelinePhase1: 'Days 1â€“30: 10 mins daily micro-session',
+        timelinePhase2: 'Days 30â€“90: 20 mins consistent practice',
+        timelinePhase3: 'Days 90â€“180: Deep habit mastery',
       },
       {
         name: 'Daily Physical Movement',
@@ -1488,9 +1499,9 @@ export class FallbackAIAdapter implements AIProvider {
         targetFrequency: 'daily',
         chanceOfAchievement: 80,
         willpowerStrain: 'Medium',
-        timelinePhase1: 'Days 1–30: 15 mins daily brisk movement',
-        timelinePhase2: 'Days 30–90: 30 mins structured exercise',
-        timelinePhase3: 'Days 90–180: Peak physical conditioning',
+        timelinePhase1: 'Days 1â€“30: 15 mins daily brisk movement',
+        timelinePhase2: 'Days 30â€“90: 30 mins structured exercise',
+        timelinePhase3: 'Days 90â€“180: Peak physical conditioning',
       },
     ].map((goal) => normalizeTimelineOutput(goal, behaviorProfile));
 
@@ -1518,18 +1529,18 @@ export class FallbackAIAdapter implements AIProvider {
 
   async generateNudge(params: NudgeParams) {
     return {
-      message: `hey ${params.userName || 'friend'}! let's crush today's daily habits ✨`,
+      message: `hey ${params.userName || 'friend'}! let's crush today's daily habits âœ¨`,
       actionTag: 'Momentum Boost',
       category: 'health',
     };
   }
 
   async intakeTurn(params: any) {
-    return { reply: "hey! tell me what you'd like to achieve and build in your life 😊", readyForFeasibility: false };
+    return { reply: "hey! tell me what you'd like to achieve and build in your life ðŸ˜Š", readyForFeasibility: false };
   }
 
   async runFeasibilityCheck(params: FeasibilityParams): Promise<FeasibilityResult> {
-    return { pass: true, reason: 'Offline mode — assuming feasible. Connect to verify.' };
+    return { pass: true, reason: 'Offline mode â€” assuming feasible. Connect to verify.' };
   }
 
   async runWillpowerAssessment(_params: any) {
@@ -1545,11 +1556,11 @@ export class FallbackAIAdapter implements AIProvider {
   }
 
   async frameTasks(params: FrameTasksParams) {
-    return { framedTasks: params.tasks.map((t) => ({ title: t.title, framedTitle: t.title, motivationalNote: 'One step at a time! 😊' })) };
+    return { framedTasks: params.tasks.map((t) => ({ title: t.title, framedTitle: t.title, motivationalNote: 'One step at a time! ðŸ˜Š' })) };
   }
 
   async lapseRecovery(params: LapseRecoveryParams) {
-    return { message: `missed a few on ${params.goalName} — no problem, let's take a small step today 😊` };
+    return { message: `missed a few on ${params.goalName} â€” no problem, let's take a small step today ðŸ˜Š` };
   }
 }
 
