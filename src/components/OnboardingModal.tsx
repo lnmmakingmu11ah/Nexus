@@ -30,7 +30,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     {
       id: 'init-1',
       sender: 'ai',
-      text: "hey welcome to NEXUS \u{1F602} im gonna get to know u properly before pretending i can plan ur whole life, bc apparently details matter... annoying but true \u{1F605} what should i call u?",
+      text: "hey welcome to NEXUS 😊 im gonna get to know u — not just this year, but ur whole life vision. where u live, what u do, what u wanna become, what's been holding u back... then i build u a lifetime plan. what should i call u?",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -172,7 +172,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     onComplete(partialConfig, []);
   };
 
-  const showPlanCta = readyForPlan || chatMessages.filter((m) => m.sender === 'user').length >= 3;
+  const showPlanCta = readyForPlan || chatMessages.filter((m) => m.sender === 'user').length >= 5;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md overflow-y-auto flex justify-center items-start p-3 sm:p-4">

@@ -536,6 +536,12 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
               <h3 className="text-base font-bold text-white leading-snug">
                 {blueprint.masterVision}
               </h3>
+              {blueprint.userProfileSummary && (
+                <p className="text-xs text-zinc-400 font-light leading-relaxed border-t border-zinc-800/80 pt-3">
+                  <span className="text-zinc-500 font-mono text-[10px] uppercase">About you: </span>
+                  {blueprint.userProfileSummary}
+                </p>
+              )}
             </div>
           )}
 
@@ -637,6 +643,11 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
                               {CATEGORY_NAMES[planned.category as keyof typeof CATEGORY_NAMES] || planned.category}
                             </span>
                             <h4 className="text-base font-bold text-white mt-1.5">{planned.name}</h4>
+                            {planned.autoAdded && (
+                              <span className="inline-block mt-1 text-[10px] font-mono text-violet-300 bg-violet-500/10 border border-violet-500/25 px-2 py-0.5 rounded-full">
+                                NEXUS added — pillar balance
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-col items-end gap-1 shrink-0">
                             {planned.reminderTime && (
@@ -654,6 +665,11 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
                         <p className="text-xs text-zinc-300 font-light leading-relaxed bg-zinc-900/60 p-3 rounded-xl border border-zinc-800/80">
                           {planned.description}
                         </p>
+                        {planned.autoAddedReason && (
+                          <p className="text-[11px] text-violet-300/90 font-light leading-relaxed bg-violet-500/5 p-2.5 rounded-lg border border-violet-500/20">
+                            {planned.autoAddedReason}
+                          </p>
+                        )}
                         {(planned.goalScope || planned.scopeNote || plannedTimelineLabel(planned)) && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <div className="p-2 rounded-lg bg-zinc-900/80 border border-zinc-800/60">
@@ -782,6 +798,11 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
                     <span className="text-[10px] font-mono uppercase font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20">
                       Roadblock: {rb.roadblock}
                     </span>
+                    {Array.isArray(rb.affectedGoals) && rb.affectedGoals.length > 0 && (
+                      <p className="text-[10px] text-zinc-400 font-mono">
+                        Threatens: {rb.affectedGoals.join(', ')}
+                      </p>
+                    )}
                     <p className="text-xs text-zinc-200 font-light leading-relaxed">
                       <strong className="text-emerald-400 font-semibold">AI Solution:</strong> {rb.solution}
                     </p>

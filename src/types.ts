@@ -71,6 +71,8 @@ export interface AIPlannedGoal {
   description: string;
   goalScope?: string;
   scopeNote?: string;
+  autoAdded?: boolean;
+  autoAddedReason?: string;
   category: CategoryKey;
   reminderTime?: string;
   basePoints: number;
@@ -100,15 +102,30 @@ export interface GoalStackUp {
   rationale: string;
 }
 
+export interface BlueprintRoadblock {
+  roadblock: string;
+  solution: string;
+  affectedGoals?: string[];
+}
+
 export interface MasterBlueprint {
   userName: string;
   masterVision: string;
   overallWillpowerIndex?: number;
   plannedGoals: AIPlannedGoal[];
-  roadblocks: { roadblock: string; solution: string }[];
+  roadblocks: BlueprintRoadblock[];
   goalCorrelations?: GoalCorrelation[];
   goalStackUps?: GoalStackUp[];
   categoryBaselines?: CategoryScores;
+  pillarAutoFillNotes?: string;
+  userProfileSummary?: string;
+  extractedSetbacks?: string[];
+  intakeSummary?: {
+    profileComplete?: boolean;
+    lifeGoalsDiscussed?: boolean;
+    setbacksDiscussed?: boolean;
+    pillarsCovered?: Partial<CategoryScores>;
+  };
   createdAt: string;
   status?: 'building' | 'ready' | 'failed';
 }

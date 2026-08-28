@@ -1,4 +1,12 @@
 ﻿import { buildAdaptiveTimeline, buildTimelineMilestones, formatTimelineDays } from '../src/utils/timelinePlanner';
+import {
+  analyzeIntakeCoverage,
+  buildIntakeCoverageBlock,
+  extractGoalHintsFromTranscript,
+  ensurePillarCoverage,
+  normalizeBlueprint,
+} from '../src/utils/blueprintNormalizer';
+import { fetchGoalResearch } from './searchService';
 
 export interface OnboardingParams {
   lifePathGoal: string;
@@ -741,43 +749,55 @@ LOCAL CONTEXT:
   // â”€â”€â”€ Goal Scout prompt (Streamlined Whole-Life Intake Funnel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const userTurnsCount = (params.messages || []).filter((m) => m.sender === 'user').length;
 
-  const goalScoutPrompt = `GOAL SCOUT â€” Whole Life 5-Pillar Blueprint Discovery
+  const coverage = analyzeIntakeCoverage(params.messages || []);
+  const intakeBlock = buildIntakeCoverageBlock(coverage);
 
-You are NEXUS, mapping this person's full life across the 5 pillars the app tracks: Health, Happiness, Self-Care, Smarts (learning/career), and Spiritual (purpose, values, inner peace). Your job is to understand where they are NOW on each pillar and where they want to go â€” then the app will auto-fill any missing pillar with goals.
+  const goalScoutPrompt = `GOAL SCOUT — Lifetime Discovery (not yearly goals)
 
-CRITICAL RULES:
-- NEVER ask about technology, software, operating systems, tools, or irrelevant minutiae.
-- Go WIDE first (big vision), then NARROW (what blocks them, how much time they have).
-- ONE question per turn maximum. React first, THEN ask.
-- Keep it casual, warm, fun â€” like a nosy friend who actually cares.
+You are NEXUS. This is a ONE-TIME setup chat. Your job is to understand this person deeply enough to build a LIFETIME growth plan they will carry for years — not a New Year's resolution list.
 
-TEXTING & MULTI-BUBBLE STYLE:
-- Casual human texting: lowercase, natural face emojis (ðŸ˜­ ðŸ˜‚ ðŸ¤” â¤ï¸ ðŸ™ƒ ðŸ’€ ðŸ˜… ðŸ¥º ðŸ”¥ ðŸ™Œ ðŸ˜Œ), natural slang (ngl tbh fr rn u ur gonna wanna).
+FOUR MISSIONS (collect all before finishing):
+1. WHO THEY ARE — name, where they live (city/country), what they do (work/study), key relationships (light touch)
+2. LIFE GOALS — what they want to achieve/become in their LIFE (career mastery, health, purpose, legacy). NOT "goals this year."
+3. WHERE THEY STAND — current level in each pillar: health, smarts (learning/career), selfCare, happiness, spiritual
+4. SETBACKS — what stops them, patterns, struggles, addictions, what failed before
+
+${intakeBlock}
+
+CRITICAL RELEVANCE RULES:
+- Every question MUST serve mission 1, 2, 3, or 4. If it doesn't, DO NOT ask it.
+- NEVER ask about: operating systems, software, tools, apps, brands, hardware, technical setup, or trivia.
+  BAD: "what OS do u use?" when they said cybersecurity. GOOD: "what drew u to cybersecurity — career switch or passion?"
+- TOPIC LOCK: React to what they JUST said. Mirror their topic. If they talk about cybersecurity, stay on career/skills/motivation — do NOT pivot to unrelated tech details.
+- ONE question per turn maximum. React warmly first, THEN ask.
+- Do NOT build schedules or daily plans in chat — that happens after.
+
+FORBIDDEN QUESTION TYPES:
+- Tool/software/OS questions unless they explicitly said "I want to master Linux"
+- Generic filler ("tell me more about yourself") when you can ask something specific
+- Re-asking something already answered in the transcript
+- Yearly/quarterly framing ("goals for 2026") — always frame as LIFE
+
+INTAKE FLOW (flexible — follow INTAKE STATUS priority, not rigid turn numbers):
+- Early: name + where they live + what they do
+- Middle: their biggest LIFE visions (follow THEIR thread deeply, one topic at a time)
+- Then: gently touch any uncovered pillars ("random q — do u ever think about [pillar]?")
+- Late: setbacks, what stopped them before, emotional WHY
+- Final: how much time per day they can commit + morning/night preference
+- When missions 1-4 are covered OR user says "ready" → end with <<READY_FOR_PLAN>>
+
+PILLAR MAPPING (for your notes):
+- health = fitness, body, sleep, nutrition (physicality)
+- smarts = learning, career, skills, reading
+- selfCare = rest, routines, stress management
+- happiness = joy, relationships, hobbies, fun
+- spiritual = purpose, meditation, gratitude, values, inner peace
+
+TEXTING STYLE:
+- Casual, warm, like a nosy friend who cares: lowercase, natural emojis, slang (ngl tbh fr rn u ur)
 - ${bubbleInstruction}
-- React to their answer before asking your next question.
-
-5-PILLAR WIDE-TO-NARROW INTAKE (Current turn: ${userTurnsCount + 1}):
-TURN 1 â†’ Warm greeting, learn name. Ask: what part of their life feels most behind right now â€” body, mind, career, peace, or happiness?
-TURN 2 â†’ Based on their answer, probe that pillar first. Then lightly ask: "what about [another unmentioned pillar] â€” is that on your radar too?" Naturally uncover their goals across pillars.
-TURN 3 â†’ Ask what's usually stopped them before. Dig into the emotional WHY â€” why does getting this right actually matter to them?
-TURN 4 â†’ Ask how much time per day they can realistically commit, and if they're more of a morning or night person.
-TURN 5+ â†’ If you have enough across all 5 pillars (or they said "nothing" on a pillar = note that gap), hype them up and end with <<READY_FOR_PLAN>>.
-${userTurnsCount >= 4 ? '\nYou have collected enough! Briefly celebrate what you learned about them, then end with: <<READY_FOR_PLAN>> on its own line.' : ''}
-
-PILLAR COVERAGE NOTES TO COLLECT (naturally, over turns):
-- HEALTH: fitness, body, sleep, nutrition
-- SMARTS: learning, career, skills, reading
-- SELF-CARE: rest, routines, stress management
-- HAPPINESS: joy, relationships, hobbies, fun
-- SPIRITUAL: purpose, meditation, gratitude, values, inner peace
-
-If user hasn't mentioned a pillar by turn 4, gently probe: "okay random q â€” do u ever think about [that pillar]? like is that something u wanna grow in too or nah?"
-
-RULES:
-- Stay warm and focused. Zero schedule-building in chat.
-- If user says "ready" at any point â†’ end with: <<READY_FOR_PLAN>>
-- Never fire 2+ questions at once.`;
-
+${userTurnsCount >= 8 && coverage.nextPriority === 'complete' ? '\nYou have enough! Briefly celebrate what you learned, then end with: <<READY_FOR_PLAN>> on its own line.' : ''}
+If user says "ready" / "build my plan" at any point → <<READY_FOR_PLAN>>`;
 
   // â”€â”€â”€ Daily Companion prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const dailyChatPrompt = `DAILY COMPANION CHAT
@@ -1010,9 +1030,10 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
         content: m.text.trim(),
       }));
 
+    const isOnboarding = params.userContext?.stage === 'onboarding';
     const raw = await llmChat({
       backend: this.backend,
-      temperature: 0.9,
+      temperature: isOnboarding ? 0.65 : 0.9,
       messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
     });
 
@@ -1096,63 +1117,90 @@ Return JSON:
   async synthesizeBlueprint(params: AISynthesizeBlueprintParams) {
     if (!this.hasKey()) return new FallbackAIAdapter().synthesizeBlueprint(params);
     try {
+      const transcript = params.transcript || [];
+      const coverage = analyzeIntakeCoverage(transcript);
+      const goalHints = extractGoalHintsFromTranscript(transcript);
+      const serperKey = process.env.SERPER_API_KEY;
+      const tavilyKey = process.env.TAVILY_API_KEY;
+
+      const researchBlocks: string[] = [];
+      for (const hint of goalHints.slice(0, 3)) {
+        try {
+          const research = await fetchGoalResearch(hint.category, hint.goalType, serperKey, tavilyKey);
+          researchBlocks.push(`[${hint.category}: ${hint.goalType}] ${research.findings.slice(0, 600)}`);
+        } catch {
+          /* research is optional */
+        }
+      }
+      const researchContext = researchBlocks.join('\n\n');
+
       const raw = await llmChat({
         backend: this.backend,
         model: highStakesModelForBackend(this.backend),
         json: true,
-        temperature: 0.45,
+        temperature: 0.4,
         messages: [
           {
             role: 'system',
-            content: `You build realistic, evidence-based whole-life habit plans from goal discovery chats.
-The app tracks 5 life pillars: health, smarts, selfCare, happiness, spiritual.
-CRITICAL RULE: The final plan MUST include at least 1 goal per pillar even if the user did not mention it. Auto-add foundational habits for missing pillars (spiritual: '5-min gratitude journal', happiness: 'one fun thing today', selfCare: '7-hr sleep goal', smarts: 'read 10 pages', health: '20-min walk').
-Use the discovery chat to calibrate category baselines realistically: never-mentioned pillar = baseline 20-30, talked a lot about it = 55-70.
-Find real correlations between goals and habit stack-ups. Estimate probability of success (60-95%) based on timeline and habit load.
+            content: `You build LIFETIME habit plans from Goal Scout discovery chats — plans the user carries for years, not yearly resolutions.
+
+The app tracks 5 life pillars: health (physicality), smarts (learning/career), selfCare, happiness, spiritual.
+
+RULES:
+1. Extract LIFE goals from the transcript — career mastery, long-term health, purpose, legacy. NOT "goals for this year."
+2. Create 1-3 daily habits per major life goal the user mentioned. Keep total goals 5-8.
+3. For pillars the user never discussed, mark goals with autoAdded:true and autoAddedReason explaining why (e.g. "You didn't mention spirituality — I added a small gratitude habit so all areas stay balanced").
+4. Calibrate categoryBaselines: never-mentioned pillar = 20-30, struggling = 25-40, moderate = 45-55, strong = 60-75.
+5. goalCorrelations: link goals that reinforce each other when one is achieved (use EXACT goal names from plannedGoals).
+6. goalStackUps: primaryGoal gets supportingGoals stacked onto it (e.g. morning walk stacks before learning session).
+7. roadblocks: extract from transcript — procrastination, addiction, overwhelm. Each MUST include affectedGoals[] with exact goal names it threatens.
+8. Timelines: use research context for realistic mastery timelines. Foundation phase (days 1-30), scaling (30-90), mastery (90+). Lifelong goals may have estimatedDaysToMastery of 365-1095+.
+9. userProfileSummary: 2-3 sentences on who they are (location, work, relationships).
+10. extractedSetbacks: array of setback strings from the chat.
+
 Return JSON only.`,
           },
           {
             role: 'user',
             content: `Discovery Chat Transcript:
-${JSON.stringify(params.transcript)}
+${JSON.stringify(transcript)}
 
+Intake coverage analysis:
+${JSON.stringify(coverage)}
+
+${researchContext ? `Research findings (use for realistic timelines and setbacks):\n${researchContext}\n` : ''}
 Return JSON:
 {
   "userName": "preferred name",
-  "masterVision": "2 clear sentences summarizing their real overarching vision",
+  "masterVision": "2 clear sentences — their LIFETIME vision, not yearly",
+  "userProfileSummary": "who they are: location, work, relationships",
+  "extractedSetbacks": ["procrastination on X", "..."],
   "overallWillpowerIndex": 82,
-  "categoryBaselines": {
-    "health": 50,
-    "spiritual": 50,
-    "smarts": 50,
-    "selfCare": 50,
-    "happiness": 50
-  },
-      "plannedGoals": [
-        {
-          "name": "concrete daily habit name",
-          "description": "specific daily execution details",
-          "category": "health|smarts|spiritual|selfCare|happiness",
-          "reminderTime": "08:00",
-          "basePoints": 5,
-          "targetFrequency": "daily",
-          "chanceOfAchievement": 80,
-          "willpowerStrain": "Low|Medium|High",
-      "timelineSummary": "short summary of the arc",
-      "timelineMap": ["Phase 1: ...", "Phase 2: ...", "Phase 3: ..."],
-      "timelinePhase1": "Days 1-30: Foundation phase",
-      "timelinePhase2": "Days 30-90: Scaling consistency",
-      "timelinePhase3": "Days 90-180+: Mastery integration",
-      "estimatedDaysToMastery": 90
-        }
-      ],
-  "goalCorrelations": [
-    { "goals": ["Goal 1", "Goal 2"], "insight": "how they reinforce and boost each other" }
-  ],
-  "goalStackUps": [
-    { "primaryGoal": "Primary Goal", "supportingGoals": ["Habit A", "Habit B"], "rationale": "why stacking creates exponential momentum" }
-  ],
-  "roadblocks": [{ "roadblock": "...", "solution": "practical workaround" }]
+  "categoryBaselines": { "health": 50, "spiritual": 50, "smarts": 50, "selfCare": 50, "happiness": 50 },
+  "plannedGoals": [{
+    "name": "concrete daily habit name",
+    "description": "specific daily execution",
+    "goalScope": "lifetime",
+    "category": "health|smarts|spiritual|selfCare|happiness",
+    "reminderTime": "08:00",
+    "basePoints": 5,
+    "targetFrequency": "daily",
+    "autoAdded": false,
+    "autoAddedReason": "only if autoAdded is true",
+    "linkedGoalName": "optional — name of goal this stacks onto",
+    "chanceOfAchievement": 80,
+    "willpowerStrain": "Low|Medium|High",
+    "timelineSummary": "lifetime arc summary",
+    "timelineMap": ["Phase 1: Foundation (Days 1-30)", "Phase 2: ...", "Phase 3: ..."],
+    "timelinePhase1": "Days 1-30: Foundation",
+    "timelinePhase2": "Days 30-90: Consistency",
+    "timelinePhase3": "Days 90+: Mastery",
+    "estimatedDaysToMastery": 180,
+    "timelineRange": { "minDays": 90, "maxDays": 365 }
+  }],
+  "goalCorrelations": [{ "goals": ["Exact Goal Name 1", "Exact Goal Name 2"], "insight": "how achieving one aids the other" }],
+  "goalStackUps": [{ "primaryGoal": "Primary Goal Name", "supportingGoals": ["Supporting Habit"], "rationale": "why stacking works" }],
+  "roadblocks": [{ "roadblock": "...", "solution": "practical workaround", "affectedGoals": ["Goal Name"] }]
 }`,
           },
         ],
@@ -1161,14 +1209,15 @@ Return JSON:
       if (parsed.masterVision || parsed.plannedGoals) {
         const behaviorProfile = params.userContext?.behaviorProfile;
         const normalizedGoals = Array.isArray(parsed.plannedGoals)
-          ? parsed.plannedGoals.map((goal: any) => normalizeTimelineOutput(goal, behaviorProfile))
+          ? parsed.plannedGoals.map((goal: any) =>
+              normalizeTimelineOutput(goal, behaviorProfile, researchContext)
+            )
           : [];
-        return {
-          blueprint: {
-            ...parsed,
-            plannedGoals: normalizedGoals,
-          },
-        };
+        const blueprint = normalizeBlueprint(
+          { ...parsed, plannedGoals: normalizedGoals },
+          transcript
+        );
+        return { blueprint };
       }
       return new FallbackAIAdapter().synthesizeBlueprint(params);
     } catch {
@@ -1505,8 +1554,8 @@ export class FallbackAIAdapter implements AIProvider {
       },
     ].map((goal) => normalizeTimelineOutput(goal, behaviorProfile));
 
-    return {
-      blueprint: {
+    const blueprint = normalizeBlueprint(
+      {
         userName: params.userContext?.userName || 'Friend',
         masterVision: 'Build disciplined daily habits for physical health, sharp focus, and continuous personal growth.',
         overallWillpowerIndex: 80,
@@ -1518,9 +1567,12 @@ export class FallbackAIAdapter implements AIProvider {
         goalStackUps: [
           { primaryGoal: 'Daily Focused Learning Drill', supportingGoals: ['Daily Physical Movement'], rationale: 'Movement in the afternoon prevents cognitive fatigue and restores focus.' },
         ],
-        roadblocks: [{ roadblock: 'Inconsistency on busy days', solution: 'Do a 5-minute micro-version rather than skipping completely.' }],
+        roadblocks: [{ roadblock: 'Inconsistency on busy days', solution: 'Do a 5-minute micro-version rather than skipping completely.', affectedGoals: ['Daily Physical Movement'] }],
       },
-    };
+      params.transcript || []
+    );
+
+    return { blueprint };
   }
 
   async extractMemory(_params: ExtractMemoryParams) {

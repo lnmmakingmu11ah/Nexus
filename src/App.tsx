@@ -65,6 +65,7 @@ import { fallbackGoalDraft, fallbackMilestones, fallbackTask } from './utils/pla
 import { detectOverlaps, buildDependencyGraph } from './utils/dependencyGraph';
 import { buildAdaptiveTimeline, buildTimelineMilestones } from './utils/timelinePlanner';
 import { computeBehaviorProfile } from './utils/behaviorProfile';
+import { matchGoalByName } from './utils/blueprintNormalizer';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
@@ -380,7 +381,9 @@ export default function App() {
             return {
               id,
               name: pg.name || `Goal ${idx + 1}`,
-              description: pg.description || '',
+              description: pg.autoAddedReason
+                ? `${pg.description || ''}\n\n(NEXUS note: ${pg.autoAddedReason})`.trim()
+                : pg.description || '',
               category: cat,
               frequency: pg.targetFrequency || 'daily',
               reminderTime: pg.reminderTime || '08:30',
@@ -398,6 +401,30 @@ export default function App() {
             };
           }
         );
+
+        // Apply habit stacking from blueprint (linkedGoalName + goalStackUps)
+        for (const pg of blueprint?.plannedGoals || []) {
+          const goal = matchGoalByName(pg.name, newGoals);
+          if (!goal) continue;
+          const stackTarget = pg.linkedGoalName
+            ? matchGoalByName(pg.linkedGoalName, newGoals)
+            : undefined;
+          if (stackTarget && stackTarget.id !== goal.id) {
+            goal.linkedGoalId = stackTarget.id;
+            goal.stackingNote = `Stacks after: ${stackTarget.name}`;
+          }
+        }
+        for (const stack of blueprint?.goalStackUps || []) {
+          const primary = matchGoalByName(stack.primaryGoal, newGoals);
+          if (!primary) continue;
+          for (const supportingName of stack.supportingGoals || []) {
+            const supporting = matchGoalByName(supportingName, newGoals);
+            if (supporting && supporting.id !== primary.id) {
+              supporting.linkedGoalId = primary.id;
+              supporting.stackingNote = stack.rationale || `Supports ${primary.name}`;
+            }
+          }
+        }
 
         // Build milestones for each goal
         const newMilestones: Milestone[] = [];
@@ -443,30 +470,44 @@ export default function App() {
           }
         });
 
-        // Build dependencies from correlations & stackups
-        const newDeps: GoalDependency[] = (blueprint?.goalCorrelations || []).map((gc: any, idx: number) => {
-          const g1 = newGoals.find(g => gc.goals?.[0] && g.name.toLowerCase().includes(gc.goals[0].toLowerCase())) || newGoals[0];
-          const g2 = newGoals.find(g => gc.goals?.[1] && g.name.toLowerCase().includes(gc.goals[1].toLowerCase())) || newGoals[1] || newGoals[0];
-          return {
+        // Build dependencies from correlations (exact name matching)
+        const newDeps: GoalDependency[] = (blueprint?.goalCorrelations || []).flatMap((gc: any, idx: number) => {
+          const names = Array.isArray(gc.goals) ? gc.goals : [];
+          if (names.length < 2) return [];
+          const g1 = matchGoalByName(names[0], newGoals);
+          const g2 = matchGoalByName(names[1], newGoals);
+          if (!g1 || !g2 || g1.id === g2.id) return [];
+          return [{
             id: `dep-${Date.now()}-${idx}`,
-            fromGoalId: g1?.id || 'goal-1',
-            toGoalId: g2?.id || 'goal-2',
-            type: 'shared_infrastructure',
+            fromGoalId: g1.id,
+            toGoalId: g2.id,
+            type: 'shared_infrastructure' as const,
             rationale: gc.insight || 'Reinforces daily habit momentum',
-          };
+          }];
         });
 
         const baselines = blueprint?.categoryBaselines || {
           health: 50, spiritual: 50, smarts: 50, selfCare: 50, happiness: 50,
         };
 
+        const blueprintMemory = mergeMemory(partialConfig.aiMemory, {
+          userProfile: blueprint?.userProfileSummary || partialConfig.aiMemory?.userProfile,
+          knownGoals: newGoals.map((g) => g.name),
+          setbacks: blueprint?.extractedSetbacks || [],
+          motivations: blueprint?.masterVision ? [blueprint.masterVision] : [],
+          personalNotes: blueprint?.pillarAutoFillNotes ? [blueprint.pillarAutoFillNotes] : [],
+          lastUpdated: new Date().toISOString(),
+        });
+
         const finalConfig: UserConfig = {
           ...partialConfig,
           userName: blueprint?.userName || partialConfig.userName,
           lifePathGoal: blueprint?.masterVision || partialConfig.lifePathGoal,
           categoryBaselines: baselines,
+          aiMemory: blueprintMemory,
+          onboardingTranscript: transcript,
           masterBlueprint: blueprint
-            ? { ...blueprint, createdAt: new Date().toISOString() }
+            ? { ...blueprint, createdAt: new Date().toISOString(), status: 'ready' }
             : undefined,
         };
 
