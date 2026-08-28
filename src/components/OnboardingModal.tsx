@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, Bot, User, Loader2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { UserConfig, AIChatMessage, Goal } from '../types';
@@ -130,7 +130,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           await new Promise<void>((resolve) => setTimeout(resolve, 650 + Math.random() * 650));
         }
         const bubble: import('../types').AIChatMessage = {
-          id: `ai--`,
+          id: `ai-${Date.now()}-${i}`,
           sender: 'ai',
           text: stripPlanToken(bubbles[i]),
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -144,12 +144,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       setLastAiError(errText);
       const isNetwork = err?.code === 'NETWORK_OFFLINE' || /Cannot reach/i.test(errText);
       const reply = isNetwork
-        ? `\n\n(meanwhile) `
+        ? `${apiOfflineMessage(Capacitor.isNativePlatform())}\n\n(meanwhile) ${smartOfflineReply(text, 'onboarding', userNameInput || undefined)}`
         : smartOfflineReply(text, 'onboarding', userNameInput || undefined);
       setChatMessages((prev) => [
         ...prev,
         {
-          id: `ai-err-`,
+          id: `ai-err-${Date.now()}`,
           sender: 'ai',
           text: reply,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
