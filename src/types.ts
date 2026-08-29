@@ -214,6 +214,13 @@ export interface NexusPersona {
   updatedAt?: string;
 }
 
+export interface OpenMomentNotificationSettings {
+  enabled: boolean;
+  wakeTime: string; // HH:mm
+  bedTime: string; // HH:mm
+  windowMinutes: number;
+}
+
 export interface UserConfig {
   onboarded: boolean;
   userName?: string;
@@ -254,6 +261,7 @@ export interface UserConfig {
   adaptiveWarnings?: AdaptiveTimelineWarning[];
   lastAdaptiveSyncAt?: string;
   pendingPlanReview?: PendingPlanReview;
+  openMomentNotifications?: OpenMomentNotificationSettings;
 }
 
 export interface LifeExpectancyFactor {

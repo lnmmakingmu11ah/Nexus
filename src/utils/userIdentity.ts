@@ -43,10 +43,14 @@ export function mergeIdentity(existing: UserIdentity | undefined, incoming: User
 
 /** Last-resort local parse — capture groups from full sentences, never word-list bingo. */
 export function heuristicIdentityFromTranscript(
-  transcript: { sender: 'user' | 'ai'; text: string }[],
+  transcript?: any[],
   existing?: UserIdentity
 ): UserIdentity {
-  const userText = transcript.filter((m) => m.sender === 'user').map((m) => m.text).join('\n');
+  const safeTranscript = Array.isArray(transcript) ? transcript : [];
+  const userText = safeTranscript
+    .filter((m: any) => m && (m.sender === 'user' || m.role === 'user'))
+    .map((m: any) => m.text || m.content || '')
+    .join('\n');
   const draft: UserIdentity = { ...EMPTY, source: 'heuristic', extractedAt: new Date().toISOString() };
 
   const nameM = userText.match(/(?:call me|i'?m|im|my name is)\s+([A-Z][A-Za-z\-']{1,20})/i);

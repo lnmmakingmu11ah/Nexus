@@ -21,6 +21,12 @@ export const DEFAULT_USER_CONFIG: UserConfig = {
   unlockedBadges: [],
   aiServerUrl: 'https://nexus-kp8w.onrender.com',
   locationOptIn: false,
+  openMomentNotifications: {
+    enabled: true,
+    wakeTime: '07:30',
+    bedTime: '22:00',
+    windowMinutes: 45,
+  },
 };
 
 // Standard actuarial baseline life expectancy at given age (approx based on actuarial tables)

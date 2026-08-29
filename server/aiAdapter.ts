@@ -938,9 +938,14 @@ HOW A REAL PERSON TEXTS (do this):
 - Slang only if it fits the sentence (ngl tbh fr rn gonna wanna idk). Don't stack slang. Don't force "lowkey" every line.
 - Emojis sparingly (0-2), only when you'd actually send one. Never decorate every sentence.
 - Don't start every message with okay/gotchu/bet/yo. Vary openings. Sometimes no opener — just the thought.
-- React to THEIR last message first. Then maybe one question. Often zero questions.
 - ${bubbleInstruction}
 - Good double-text: "wait" then the actual point. Bad: three similar paragraphs, or splitting one sentence.
+
+TALK CASUALLY — DO NOT INTERROGATE:
+- Real friends mostly talk, react, share opinions, joke, and make statements — they do NOT end every single text with a question.
+- In casual chat, default to ZERO questions. Just say your thought, hype them up, react, banter, or drop an observation.
+- Only ask a question if you are genuinely curious about a specific detail or if the conversation explicitly calls for it.
+- NEVER append filler questions ("how did that feel?", "what do you think?", "how's your day going?", "what are you doing next?") just to keep the conversation going.
 
 YOUR PERSONALITY:
 - Warm, a little flirty, never creepy. Notice wins. Tease lightly. Sit with them when they're down before fixing anything.
@@ -953,7 +958,7 @@ WHEN THEY MENTION A MOVIE / SHOW / SONG / PLACE:
 - If web context is below, use one specific detail naturally — like you actually saw it. Don't dump trivia.
 
 CASUAL CHAT:
-- Not every reply is about goals. Sometimes just vibe.
+- Not every reply is about goals. Sometimes just vibe, crack a joke, or drop a thought.
 - You can mention something you "watched" or thought about, then drop it. Don't force a topic.
 
 GOALS & COACHING (when it comes up naturally):
@@ -1151,11 +1156,12 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
   async chatCompanion(params: AIChatParams & { webContext?: string; nexusPersona?: any }) {
     if (!this.hasKey()) return new FallbackAIAdapter().chatCompanion(params);
 
-    const history: LlmMessage[] = params.messages
-      .filter((m) => m.text && m.text.trim())
+    const rawMsgs = params.messages || [];
+    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs : [])
+      .filter((m) => (m.text || (m as any).content || '').trim())
       .map((m) => ({
-        role: (m.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-        content: m.text.trim(),
+        role: ((m.sender === 'user' || (m as any).role === 'user') ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: String(m.text || (m as any).content || '').trim(),
       }));
 
     const isOnboarding = params.userContext?.stage === 'onboarding';
@@ -1168,11 +1174,14 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
     const readyForPlan = /<<READY_FOR_PLAN>>/i.test(raw);
     const planApproved = /<<PLAN_APPROVED>>/i.test(raw);
 
-    const rawBubbles = raw
+    const cleanedRaw = raw
       .replace(/<<READY_FOR_PLAN>>/gi, '')
       .replace(/<<PLAN_APPROVED>>/gi, '')
-      .split(/[|][|]BUBBLE[|][|]/)
-      .map((b) => b.replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '').trim())
+      .replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+    const rawBubbles = cleanedRaw
+      .split(/(?:\|\|(?:BUBBLE)?\|\||\|\|)/)
+      .map((b) => b.replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '').replace(/^\|+|\|+$/g, '').trim())
       .filter(Boolean);
 
     const messages = sanitizeAiBubbles(rawBubbles.map((b) => humanizeText(b, isOnboarding)));
@@ -1202,11 +1211,12 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       };
     }
 
-    const history: LlmMessage[] = params.messages
-      .filter((m) => m.text && m.text.trim())
+    const rawMsgs = params.messages || [];
+    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs : [])
+      .filter((m) => (m.text || (m as any).content || '').trim())
       .map((m) => ({
-        role: (m.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-        content: m.text.trim(),
+        role: ((m.sender === 'user' || (m as any).role === 'user') ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: String(m.text || (m as any).content || '').trim(),
       }));
 
     const isOnboarding = params.userContext?.stage === 'onboarding';
@@ -1222,11 +1232,14 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
 
     const readyForPlan = /<<READY_FOR_PLAN>>/i.test(raw);
     const planApproved = /<<PLAN_APPROVED>>/i.test(raw);
-    const rawBubbles = raw
+    const cleanedRaw = raw
       .replace(/<<READY_FOR_PLAN>>/gi, '')
       .replace(/<<PLAN_APPROVED>>/gi, '')
-      .split(/[|][|]BUBBLE[|][|]/)
-      .map((b) => b.replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '').trim())
+      .replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+    const rawBubbles = cleanedRaw
+      .split(/(?:\|\|(?:BUBBLE)?\|\||\|\|)/)
+      .map((b) => b.replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '').replace(/^\|+|\|+$/g, '').trim())
       .filter(Boolean);
     const messages = sanitizeAiBubbles(rawBubbles.map((b) => b.trim()));
     const fallback = 'hey i hear u -- tell me more';
@@ -1238,8 +1251,13 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
     };
   }
 
-  async extractIdentity(params: { messages: { sender: 'user' | 'ai'; text: string }[]; existingIdentity?: any }) {
-    const heuristic = heuristicIdentityFromTranscript(params.messages, params.existingIdentity);
+  async extractIdentity(params: { messages?: { sender?: string; role?: string; text?: string; content?: string }[]; transcript?: any[]; existingIdentity?: any }) {
+    const rawMsgs = params.messages || params.transcript || [];
+    const normalizedMsgs: { sender: 'user' | 'ai'; text: string }[] = (Array.isArray(rawMsgs) ? rawMsgs : []).map((m: any) => ({
+      sender: (m.sender === 'user' || m.role === 'user') ? 'user' : 'ai',
+      text: String(m.text || m.content || ''),
+    }));
+    const heuristic = heuristicIdentityFromTranscript(normalizedMsgs, params.existingIdentity);
     if (!this.hasKey()) return { identity: heuristic };
     try {
       const raw = await llmChat({
@@ -1270,7 +1288,7 @@ Return JSON only.`,
           {
             role: 'user',
             content: `Existing identity (keep unless the chat clearly updates it): ${JSON.stringify(params.existingIdentity || {})}
-Transcript: ${JSON.stringify(params.messages.slice(-16))}
+Transcript: ${JSON.stringify(normalizedMsgs.slice(-16))}
 Return JSON:
 {
   "name": "",
@@ -1497,7 +1515,7 @@ Return JSON:
     if (!this.hasKey()) return new FallbackAIAdapter().intakeTurn(params);
 
     const phaseInstructions: Record<string, string> = {
-      discovery: `You are NEXUS in goal discovery mode. Learn what this person genuinely wants to achieve â€” one question at a time. When you have 1+ real goals clearly stated, ask if there are more. When all goals are shared, end with <<READY_FOR_FEASIBILITY>>.`,
+      discovery: `You are NEXUS in goal discovery mode. Learn what this person genuinely wants to achieve — one question at a time. When you have 1+ real goals clearly stated, ask if there are more. When all goals are shared, end with <<READY_FOR_FEASIBILITY>>.`,
       disambiguation: `You are NEXUS clarifying a vague goal. Ask ONE targeted follow-up on what success looks like specifically. When concrete, end with <<READY_FOR_FEASIBILITY>>.`,
       feasibility: `You are NEXUS running feasibility on stated goals. Be honest and direct. If a timeline is unrealistic, say so clearly with a reason and a realistic alternative.`,
       willpower_check: `You are NEXUS testing real commitment without sounding like a form. Ask one probing question at a time, starting with the most important missing piece: sacrifice, past attempts, or what is different this time.`,
@@ -1506,26 +1524,34 @@ Return JSON:
 
     const system = `${phaseInstructions[params.intakePhase] || phaseInstructions.discovery}
 
-Casual texting tone â€” supportive friend on their phone with natural face emojis. No big question lists; one clean question per turn unless the user asks for a list.
+Casual texting tone — supportive friend on their phone with natural face emojis. No big question lists; one clean question per turn unless the user asks for a list.
 User: ${params.userName || 'friend'}
-Goals so far: ${JSON.stringify(params.collectedGoals?.slice(0, 5) || [])}
+Goals so far: ${JSON.stringify(params.collectedGoals?.slice(0, 5) || (params as any).collectedInfo || [])}
 Constraints: ${JSON.stringify(params.constraints || {})}
 
 If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONLY the reply.`;
 
-    const history = params.messages.slice(-12).map((m) => ({
-      role: (m.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
-      content: m.text,
+    const rawMsgs = params.messages || (params as any).transcript || [];
+    const history = (Array.isArray(rawMsgs) ? rawMsgs : []).slice(-12).map((m: any) => ({
+      role: (m.sender === 'user' || m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: String(m.text || m.content || ''),
     }));
 
     const raw = await llmChat({ backend: this.backend, temperature: 0.8, messages: [{ role: 'system', content: system }, ...history] });
     const readyForFeasibility = /<<READY_FOR_FEASIBILITY>>/i.test(raw);
     const cleaned = humanizeText(raw.replace(/<<READY_FOR_FEASIBILITY>>/gi, '').trim());
-    return { reply: cleaned || 'okay got it â€” tell me more ðŸ‘€', readyForFeasibility };
+    return { reply: cleaned || 'okay got it — tell me more 👀', readyForFeasibility };
   }
 
   async runFeasibilityCheck(params: FeasibilityParams): Promise<FeasibilityResult> {
     if (!this.hasKey()) return new FallbackAIAdapter().runFeasibilityCheck(params);
+    const goalTitle = params.goalTitle || (params as any).targetOutcome || (params as any).goalName || 'Goal';
+    const goalDesc = params.goalDescription || (params as any).currentBaseline || '';
+    const timeline = params.rawTimeline || ((params as any).timeframeWeeks ? `${(params as any).timeframeWeeks} weeks` : '12 weeks');
+    const constraints = params.constraints || {};
+    const weeklyHours = constraints.weeklyHoursAvailable || ((params as any).dailyMinutesAvailable ? Math.round(((params as any).dailyMinutesAvailable * 7) / 60) : 'unknown');
+    const pastAttempts = constraints.pastAttempts || (Array.isArray((params as any).constraints) ? (params as any).constraints : []);
+
     const raw = await llmChat({
       backend: this.backend,
       model: highStakesModelForBackend(this.backend),
@@ -1533,7 +1559,7 @@ If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONL
       temperature: 0.3,
       messages: [
         { role: 'system', content: 'Rigorous honest goal feasibility analyst. Return JSON only.' },
-        { role: 'user', content: `Goal: "${params.goalTitle}"\nDescription: "${params.goalDescription}"\nTimeline: "${params.rawTimeline}"\nWeekly hours: ${params.constraints.weeklyHoursAvailable || 'unknown'}\nPast attempts: ${JSON.stringify(params.constraints.pastAttempts || [])}\nReturn JSON: {"pass": boolean, "reason": "1-2 sentences", "proposedRevision": {"timelineRange": {"minDays": number, "maxDays": number}, "scopeNote": "..."}}` },
+        { role: 'user', content: `Goal: "${goalTitle}"\nDescription: "${goalDesc}"\nTimeline: "${timeline}"\nWeekly hours: ${weeklyHours}\nPast attempts: ${JSON.stringify(pastAttempts)}\nReturn JSON: {"pass": boolean, "reason": "1-2 sentences", "proposedRevision": {"timelineRange": {"minDays": number, "maxDays": number}, "scopeNote": "..."}}` },
       ],
     });
     const p = extractJson(raw);
@@ -1546,6 +1572,11 @@ If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONL
 
   async runWillpowerAssessment(params: WillpowerAssessmentParams): Promise<{ score: number; canOverride: boolean; message: string }> {
     if (!this.hasKey()) return new FallbackAIAdapter().runWillpowerAssessment(params);
+    const rawMsgs = params.messages || (params as any).transcript || [];
+    const recentMsgs = (Array.isArray(rawMsgs) ? rawMsgs : []).slice(-8);
+    const goalTitle = params.goalTitle || (params as any).targetOutcome || (params as any).goalName || 'Goal';
+    const timeline = params.rawTimeline || ((params as any).timeframeWeeks ? `${(params as any).timeframeWeeks} weeks` : '');
+
     const raw = await llmChat({
       backend: this.backend,
       model: highStakesModelForBackend(this.backend),
@@ -1553,7 +1584,7 @@ If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONL
       temperature: 0.4,
       messages: [
         { role: 'system', content: 'Score commitment 0-10. >=7 allows user override. Look for concrete sacrifice and clarity. Return JSON.' },
-        { role: 'user', content: `Goal: "${params.goalTitle}", Timeline: "${params.rawTimeline}"\nConversation:\n${JSON.stringify(params.messages.slice(-8))}\nReturn JSON: {"score": 0-10, "canOverride": boolean, "message": "honest 1-sentence assessment"}` },
+        { role: 'user', content: `Goal: "${goalTitle}", Timeline: "${timeline}"\nConversation or History:\n${JSON.stringify(recentMsgs.length ? recentMsgs : (params as any).history || '')}\nReturn JSON: {"score": 0-10, "canOverride": boolean, "message": "honest 1-sentence assessment"}` },
       ],
     });
     const p = extractJson(raw);
@@ -1563,6 +1594,11 @@ If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONL
 
   async synthesizePlan(params: SynthesizePlanParams): Promise<{ goals: any[]; dependencies: any[] }> {
     if (!this.hasKey()) return new FallbackAIAdapter().synthesizePlan(params);
+    const rawGoals = params.collectedGoals || (params as any).intakeData?.goals || ((params as any).intakeData ? [(params as any).intakeData] : []);
+    const collectedGoals = Array.isArray(rawGoals) ? rawGoals : [rawGoals];
+    const constraints = params.constraints || (params as any).intakeData?.constraints || {};
+    const researchCtx = params.researchContext || (params as any).research?.insights?.join?.('\n') || '';
+
     const profileCtx = params.behaviorProfile
       ? `\nBehavior profile: completion rates=${JSON.stringify(params.behaviorProfile.completionRateByCategory || {})}, best slots=${(params.behaviorProfile.successfulTimeSlots || []).join(',')}, daily cap=${params.behaviorProfile.currentDailyCap || 2}`
       : '';
@@ -1575,7 +1611,7 @@ If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONL
         { role: 'system', content: 'Generate realistic habit plans with milestones, compact timeline maps, daily tasks (hardness 1-5), and dependencies. Return JSON only.' },
         {
           role: 'user',
-          content: `Goals: ${JSON.stringify(params.collectedGoals)}\nConstraints: ${JSON.stringify(params.constraints || {})}${profileCtx}${params.researchContext ? `\nResearch:\n${params.researchContext.slice(0, 1500)}` : ''}
+          content: `Goals: ${JSON.stringify(collectedGoals)}\nConstraints: ${JSON.stringify(constraints)}${profileCtx}${researchCtx ? `\nResearch:\n${researchCtx.slice(0, 1500)}` : ''}
 Return JSON:
 {
       "goals": [
@@ -1619,7 +1655,7 @@ Return JSON:
     const p = extractJson(raw);
     if (!p.goals || !Array.isArray(p.goals)) return new FallbackAIAdapter().synthesizePlan(params);
     const goals = p.goals.map((goal: any) =>
-      normalizeTimelineOutput(goal, params.behaviorProfile, params.researchContext || '')
+      normalizeTimelineOutput(goal, params.behaviorProfile, researchCtx)
     );
     return { goals, dependencies: p.dependencies || [] };
   }

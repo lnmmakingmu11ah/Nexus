@@ -59,13 +59,14 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'goals', label: 'Goals & Weights' },
     { id: 'trends', label: 'Trends' },
     { id: 'insights', label: 'AI Insights' },
+    { id: 'focus', label: 'Focus Studio' },
     { id: 'longevity', label: 'Life Expectancy' },
   ];
 
   return (
-    <header className="app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-amber-500/20 text-zinc-100 shadow-2xl shadow-black/80">
+    <header className="app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-amber-500/20 text-zinc-100 shadow-2xl shadow-black/80 will-change-transform">
       {/* Top Golden Ambient Glow Line */}
-      <div className="h-[2px] w-full bg-gradient-to-r from-amber-500 via-emerald-400 to-amber-500 shadow-md shadow-amber-500/30" />
+      <div className="h-[2px] w-full bg-gradient-to-r from-amber-500/70 via-emerald-400/80 to-amber-500/70 shadow-sm shadow-amber-500/20" />
 
       <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-2">

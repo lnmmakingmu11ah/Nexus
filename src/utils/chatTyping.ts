@@ -100,6 +100,8 @@ export function stripChatControlTokens(text: string): string {
     .replace(/<<READY_FOR_PLAN>>/gi, '')
     .replace(/<<PLAN_APPROVED>>/gi, '')
     .replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '')
+    .replace(/\|\|(?:BUBBLE)?\|\|/gi, '')
+    .replace(/^\|+|\|+$/g, '')
     .trim();
 }
 
@@ -111,9 +113,9 @@ export function liveStreamVisible(text: string): string {
     .trim();
 }
 
-/** Split a live stream buffer on ||BUBBLE|| without waiting for the full reply. */
+/** Split a live stream buffer on ||BUBBLE|| or pipe delimiters without waiting for the full reply. */
 export function bubblesFromStreamBuffer(raw: string): { closed: string[]; current: string } {
-  const parts = (raw || '').split(/[|][|]BUBBLE[|][|]/);
+  const parts = (raw || '').split(/(?:\|\|(?:BUBBLE)?\|\||\|\|)/);
   const closed = parts.slice(0, -1).map((p) => stripChatControlTokens(p)).filter(Boolean);
   const current = stripChatControlTokens(parts[parts.length - 1] || '');
   return { closed, current };

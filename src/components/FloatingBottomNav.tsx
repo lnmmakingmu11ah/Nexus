@@ -7,6 +7,7 @@ import {
   Sparkles,
   HeartPulse,
   Bot,
+  AudioWaveform,
 } from 'lucide-react';
 
 interface FloatingBottomNavProps {
@@ -25,6 +26,7 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
     { id: 'goals', label: 'Goals', icon: Target },
     { id: 'trends', label: 'Trends', icon: TrendingUp },
     { id: 'insights', label: 'Insights', icon: Sparkles },
+    { id: 'focus', label: 'Focus', icon: AudioWaveform },
     { id: 'longevity', label: 'Longevity', icon: HeartPulse },
   ];
 
@@ -42,7 +44,8 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
             <button
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
-              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all duration-200 relative min-w-[44px] min-h-[46px] select-none ${
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all duration-200 active:scale-95 relative min-w-[44px] min-h-[46px] select-none will-change-transform ${
                 isActive
                   ? 'text-amber-300 bg-amber-500/15 border border-amber-500/30 font-semibold shadow-sm'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 font-normal'

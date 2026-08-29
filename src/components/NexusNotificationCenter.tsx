@@ -20,8 +20,10 @@ import {
   Smile,
   Shield,
   Heart,
+  Sunrise,
+  Moon,
 } from 'lucide-react';
-import { DailyGoalLog, Goal, UserConfig } from '../types';
+import { DailyGoalLog, Goal, OpenMomentNotificationSettings, UserConfig } from '../types';
 import { ScoreCalculationResult } from '../utils/scoring';
 
 interface NexusNotificationCenterProps {
@@ -32,11 +34,12 @@ interface NexusNotificationCenterProps {
   userConfig: UserConfig;
   onToggleGoal: (goalId: string) => void;
   onNavigateTab?: (tab: string) => void;
+  onUpdateUserConfig?: (config: UserConfig) => void;
 }
 
 export interface NexusNudge {
   id: string;
-  type: 'priority' | 'habit' | 'decay' | 'win' | 'burnout';
+  type: 'priority' | 'habit' | 'decay' | 'win' | 'burnout' | 'open_moment';
   categoryKey?: 'health' | 'spiritual' | 'smarts' | 'selfCare' | 'happiness';
   title: string;
   message: string;
@@ -58,10 +61,12 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
   userConfig,
   onToggleGoal,
   onNavigateTab,
+  onUpdateUserConfig,
 }) => {
   const [nudges, setNudges] = useState<NexusNudge[]>([]);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'priority' | 'habit' | 'decay' | 'win'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'priority' | 'habit' | 'decay' | 'win' | 'open_moment'>('all');
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  const [clockTick, setClockTick] = useState<number>(() => Date.now());
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('nexus_dismissed_nudges');
@@ -77,6 +82,17 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
   const [nativeNotifiedIds, setNativeNotifiedIds] = useState<Set<string>>(new Set());
 
   const userName = userConfig.userName || 'Champ';
+  const openMomentSettings: OpenMomentNotificationSettings = userConfig.openMomentNotifications || {
+    enabled: true,
+    wakeTime: '07:30',
+    bedTime: '22:00',
+    windowMinutes: 45,
+  };
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockTick(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const requestNativeNotifications = async () => {
     if (typeof Notification === 'undefined') return;
@@ -98,6 +114,65 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
     return { period: 'night', label: 'Night Recovery' };
   };
 
+  const timeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    if (Number.isNaN(hours) || Number.isNaN(minutes)) return 0;
+    return hours * 60 + minutes;
+  };
+
+  const minutesUntil = (from: number, to: number): number => {
+    const delta = Math.abs(from - to);
+    return Math.min(delta, 1440 - delta);
+  };
+
+  const isWithinOpenMoment = (targetTime: string): boolean => {
+    const now = new Date(clockTick);
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    return minutesUntil(nowMinutes, timeToMinutes(targetTime)) <= openMomentSettings.windowMinutes;
+  };
+
+  const updateOpenMomentSettings = (patch: Partial<OpenMomentNotificationSettings>) => {
+    if (!onUpdateUserConfig) return;
+    onUpdateUserConfig({
+      ...userConfig,
+      openMomentNotifications: {
+        ...openMomentSettings,
+        ...patch,
+      },
+    });
+  };
+
+  const buildOpenMomentNudge = (
+    moment: 'wake' | 'bed',
+    pendingGoals: Goal[],
+    completedCount: number,
+    activeGoalsCount: number
+  ): NexusNudge => {
+    const topGoal = pendingGoals[0];
+    const completionLine = `${completedCount}/${Math.max(activeGoalsCount, 1)} goals complete`;
+    const wakeMessage = topGoal
+      ? `Good morning ${userName}. Your mind is still open, so keep it simple: make ${topGoal.name} the first proof of the day. ${completionLine}.`
+      : `Good morning ${userName}. You are clear for the day so far. Choose one tiny promise that matches ${userConfig.lifePathGoal || 'the person you are becoming'}.`;
+    const bedMessage = topGoal
+      ? `Before bed, ${userName}: close the loop gently. ${completionLine}; if you have two minutes, give ${topGoal.name} a small honest finish.`
+      : `Before bed, ${userName}: log the win. ${completionLine}, and today has evidence worth remembering.`;
+
+    return {
+      id: `open-moment-${moment}-${todayStr}`,
+      type: 'open_moment',
+      categoryKey: topGoal?.category,
+      title: moment === 'wake' ? 'Mentally Open Moment: Start Clean' : 'Mentally Open Moment: Close the Day',
+      message: moment === 'wake' ? wakeMessage : bedMessage,
+      actionTag: moment === 'wake' ? 'Start First Step' : 'Close Loop',
+      goalId: topGoal?.id,
+      goalName: topGoal?.name,
+      timestamp: new Date(clockTick).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timeContext: moment === 'wake' ? 'After Waking' : 'Before Bed',
+      read: false,
+      dismissed: false,
+      aiGenerated: false,
+    };
+  };
   // Generate Proactive Nudges from local state & schedule engine
   useEffect(() => {
     const activeGoals = goals.filter((g) => !g.archived);
@@ -133,6 +208,16 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
 
     // 2. HABIT SCHEDULE NUDGES (Uncompleted habits scheduled or high difficulty)
     const pendingGoals = activeGoals.filter((g) => !completedGoalIdsToday.has(g.id));
+    if (openMomentSettings.enabled) {
+      const completedCount = activeGoals.length - pendingGoals.length;
+      if (isWithinOpenMoment(openMomentSettings.wakeTime)) {
+        generated.push(buildOpenMomentNudge('wake', pendingGoals, completedCount, activeGoals.length));
+      }
+      if (isWithinOpenMoment(openMomentSettings.bedTime)) {
+        generated.push(buildOpenMomentNudge('bed', pendingGoals, completedCount, activeGoals.length));
+      }
+    }
+
     if (pendingGoals.length > 0) {
       const topPending = pendingGoals[0];
       generated.push({
@@ -220,12 +305,12 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
     // Filter out locally dismissed nudge IDs
     const filtered = generated.filter((n) => !dismissedIds.has(n.id));
     setNudges(filtered);
-  }, [goals, dailyLogs, todayStr, scoreData.composite, userConfig.userName, dismissedIds]);
+  }, [goals, dailyLogs, todayStr, scoreData.composite, userConfig.userName, userConfig.lifePathGoal, userConfig.openMomentNotifications, dismissedIds, clockTick]);
 
   useEffect(() => {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
 
-    const urgentNudges = nudges.filter((n) => n.type === 'priority' || n.type === 'decay' || n.aiGenerated);
+    const urgentNudges = nudges.filter((n) => n.type === 'priority' || n.type === 'decay' || n.type === 'open_moment' || n.aiGenerated);
     urgentNudges.forEach((nudge) => {
       if (nativeNotifiedIds.has(nudge.id)) return;
       try {
@@ -332,6 +417,8 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
         return <Trophy className="w-4 h-4 text-amber-300" />;
       case 'burnout':
         return <ShieldAlert className="w-4 h-4 text-indigo-400" />;
+      case 'open_moment':
+        return <Sunrise className="w-4 h-4 text-sky-300" />;
     }
   };
 
@@ -404,6 +491,7 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
               { id: 'habit', label: '⏰ Habit Schedule' },
               { id: 'decay', label: '⚠️ Decay & Risks' },
               { id: 'win', label: '🎉 Wins' },
+              { id: 'open_moment', label: 'Open Moments' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -417,6 +505,40 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
                 {tab.label}
               </button>
             ))}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2.5 items-center bg-zinc-950/60 border border-zinc-800/70 rounded-xl p-3">
+            <label className="flex items-center gap-2.5 text-xs text-zinc-300">
+              <input
+                type="checkbox"
+                checked={openMomentSettings.enabled}
+                disabled={!onUpdateUserConfig}
+                onChange={(e) => updateOpenMomentSettings({ enabled: e.target.checked })}
+                className="accent-emerald-500"
+              />
+              <span className="font-semibold text-white">Mentally open push moments</span>
+              <span className="text-zinc-500 hidden md:inline">Progress-aware wake and bedtime motivation.</span>
+            </label>
+            <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+              <Sunrise className="w-3.5 h-3.5 text-sky-300" />
+              <input
+                type="time"
+                value={openMomentSettings.wakeTime}
+                disabled={!onUpdateUserConfig}
+                onChange={(e) => updateOpenMomentSettings({ wakeTime: e.target.value })}
+                className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-zinc-100"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-[11px] text-zinc-400">
+              <Moon className="w-3.5 h-3.5 text-indigo-300" />
+              <input
+                type="time"
+                value={openMomentSettings.bedTime}
+                disabled={!onUpdateUserConfig}
+                onChange={(e) => updateOpenMomentSettings({ bedTime: e.target.value })}
+                className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-zinc-100"
+              />
+            </label>
           </div>
 
           {/* Nudge Feed List */}

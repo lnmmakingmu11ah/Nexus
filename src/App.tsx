@@ -12,6 +12,7 @@ import { InsightsView } from './components/InsightsView';
 import { LifeExpectancyView } from './components/LifeExpectancyView';
 import { AICoachView } from './components/AICoachView';
 import { AchievementsView } from './components/AchievementsView';
+import { FocusStudio } from './components/FocusStudio';
 import { ProofVerificationModal } from './components/ProofVerificationModal';
 import { CompletionReviewModal } from './components/CompletionReviewModal';
 import { StreakToastContainer, StreakToastData } from './components/StreakToast';
@@ -894,6 +895,7 @@ export default function App() {
               userConfig={userConfig}
               onToggleGoal={handleToggleGoal}
               onNavigateTab={(tab) => setCurrentTab(tab)}
+              onUpdateUserConfig={handleUpdateUserConfig}
             />
           </div>
         }
@@ -952,7 +954,7 @@ export default function App() {
 
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 pb-28 sm:pb-32">
+      <main key={currentTab} className="nexus-page-enter max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 pb-nav">
         {currentTab === 'dashboard' && (
           <Dashboard
             scoreData={scoreData}
@@ -1052,6 +1054,15 @@ export default function App() {
             dailyLogs={dailyLogs}
             onGenerateNewDigest={handleGenerateDigest}
             loading={loadingDigest}
+          />
+        )}
+
+        {currentTab === 'focus' && (
+          <FocusStudio
+            goals={goals}
+            dailyLogs={dailyLogs}
+            todayStr={todayStr}
+            userConfig={userConfig}
           />
         )}
 
