@@ -1,4 +1,5 @@
 import { CategoryKey, DailyGoalLog, DailyJournal, Goal, UserConfig } from '../types';
+import { computeEngagementTier, evaluateMicroRewards, getStreakBadgeThreshold } from './zeroToHero';
 
 export interface BadgeDefinition {
   id: string;
@@ -17,6 +18,46 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
     icon: '🚀',
     color: 'from-emerald-400 to-teal-500',
     requirementText: 'Complete 1 goal check-in',
+  },
+  {
+    id: 'micro_first_win',
+    name: 'You Showed Up',
+    description: 'Completed your first tiny win — the hardest part is starting',
+    icon: '🌱',
+    color: 'from-lime-300 to-emerald-500',
+    requirementText: 'Log any completion while rebuilding momentum',
+  },
+  {
+    id: 'micro_showed_up',
+    name: 'Bed Made Energy',
+    description: 'A small completion still counts. NEXUS saw you.',
+    icon: '🛏️',
+    color: 'from-sky-300 to-cyan-500',
+    requirementText: 'Complete one habit on a low-motivation stretch',
+  },
+  {
+    id: 'micro_two_day',
+    name: 'Two-Day Spark',
+    description: 'Did the same habit two days in a row — that is how streaks begin',
+    icon: '✨',
+    color: 'from-amber-300 to-yellow-500',
+    requirementText: 'Complete any goal on two consecutive days',
+  },
+  {
+    id: 'micro_made_bed',
+    name: 'Self-Care Spark',
+    description: 'Took care of a self-care habit. Tiny, real, yours.',
+    icon: '🪞',
+    color: 'from-fuchsia-300 to-pink-500',
+    requirementText: 'Complete a self-care goal',
+  },
+  {
+    id: 'micro_tiny_step',
+    name: 'Three Tiny Steps',
+    description: 'Three completions. You are not starting from zero anymore.',
+    icon: '👣',
+    color: 'from-emerald-300 to-teal-500',
+    requirementText: 'Log 3 completions while in rebuild mode',
   },
   {
     id: 'daily_sweep',
@@ -514,15 +555,21 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
 
 
 export function evaluateBadges(
-  goals: Goal[],
-  dailyLogs: DailyGoalLog[],
-  journals: DailyJournal[],
-  compositeScore: number,
-  categoryScores: Record<string, number>,
-  currentUserConfig: UserConfig
+  goals: Goal[] = [],
+  dailyLogs: DailyGoalLog[] = [],
+  journals: DailyJournal[] = [],
+  compositeScore: number = 0,
+  categoryScores: Record<string, number> = {},
+  currentUserConfig: Partial<UserConfig> = {}
 ): { unlockedBadgeIds: string[]; hasNewUnlocks: boolean } {
-  const currentUnlocked = new Set<string>(currentUserConfig.unlockedBadges || []);
+  const currentUnlocked = new Set<string>(currentUserConfig?.unlockedBadges || []);
   let newlyUnlockedCount = 0;
+  const tier = currentUserConfig?.behaviorProfile?.engagementTier || computeEngagementTier(currentUserConfig?.behaviorProfile);
+
+  evaluateMicroRewards(tier, dailyLogs, goals, currentUnlocked).forEach((id) => {
+    currentUnlocked.add(id);
+    newlyUnlockedCount++;
+  });
 
   const totalCompletions = dailyLogs.filter((l) => l.completed).length;
   const verifiedCount = dailyLogs.filter((l) => l.completed && l.proofVerified).length;
@@ -608,19 +655,19 @@ export function evaluateBadges(
   const maxGoalCompletions = Math.max(0, ...Object.values(completionCountsByGoal));
 
   // 6. 7-Day Vanguard
-  if (!currentUnlocked.has('consistency_king') && maxGoalCompletions >= 7) {
+  if (!currentUnlocked.has('consistency_king') && maxGoalCompletions >= getStreakBadgeThreshold(7, tier)) {
     currentUnlocked.add('consistency_king');
     newlyUnlockedCount++;
   }
 
   // 7. Fortnight Focus
-  if (!currentUnlocked.has('fortnight_master') && maxGoalCompletions >= 14) {
+  if (!currentUnlocked.has('fortnight_master') && maxGoalCompletions >= getStreakBadgeThreshold(14, tier)) {
     currentUnlocked.add('fortnight_master');
     newlyUnlockedCount++;
   }
 
   // 8. Monthly Titan
-  if (!currentUnlocked.has('monthly_titan') && maxGoalCompletions >= 30) {
+  if (!currentUnlocked.has('monthly_titan') && maxGoalCompletions >= getStreakBadgeThreshold(30, tier)) {
     currentUnlocked.add('monthly_titan');
     newlyUnlockedCount++;
   }
@@ -816,11 +863,11 @@ export function evaluateBadges(
   }
 
   // ── NEW: Streak Milestones (3, 5, 60, 100) ─────────────────────────────
-  if (!currentUnlocked.has('streak_3') && maxGoalCompletions >= 3) {
+  if (!currentUnlocked.has('streak_3') && maxGoalCompletions >= getStreakBadgeThreshold(3, tier)) {
     currentUnlocked.add('streak_3');
     newlyUnlockedCount++;
   }
-  if (!currentUnlocked.has('streak_5') && maxGoalCompletions >= 5) {
+  if (!currentUnlocked.has('streak_5') && maxGoalCompletions >= getStreakBadgeThreshold(5, tier)) {
     currentUnlocked.add('streak_5');
     newlyUnlockedCount++;
   }

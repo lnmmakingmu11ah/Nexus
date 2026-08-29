@@ -3,7 +3,9 @@
  * Ensures pillar coverage, links setbacks to goals, and improves goal matching.
  */
 
-import { CategoryKey, CategoryScores } from '../types';
+import { CategoryKey, CategoryScores, UserIdentity } from '../types';
+import { STRUGGLING_CAP } from './dailyCap';
+import { heuristicIdentityFromTranscript, mergeIdentity } from './userIdentity';
 
 export const ALL_PILLARS: CategoryKey[] = ['health', 'smarts', 'selfCare', 'happiness', 'spiritual'];
 
@@ -18,26 +20,6 @@ export interface IntakeCoverage {
   uncoveredPillars: CategoryKey[];
   nextPriority: 'profile' | 'lifeGoals' | 'pillars' | 'setbacks' | 'capacity' | 'complete';
 }
-
-const PILLAR_KEYWORDS: Record<CategoryKey, RegExp[]> = {
-  health: [/\b(fitness|workout|gym|exercise|sleep|nutrition|diet|weight|body|physical|run|walk|health)\b/i],
-  smarts: [/\b(learn|study|career|skill|read|code|cyber|job|work|degree|certif|intelligence|cognitive|smarts)\b/i],
-  selfCare: [/\b(self.?care|rest|routine|stress|burnout|hydrat|groom|skincare|relax|recover)\b/i],
-  happiness: [/\b(happy|joy|fun|hobby|relationship|friend|family|social|love|fulfill|content)\b/i],
-  spiritual: [/\b(spirit|meditat|gratitude|purpose|values|faith|peace|mindful|meaning|soul|inner)\b/i],
-};
-
-const PROFILE_KEYWORDS = {
-  location: /\b(live in|from|city|country|based in|located|town|state|region|africa|europe|america|asia)\b/i,
-  work: /\b(work|job|career|student|studying|engineer|developer|freelance|employ|profession|company|business)\b/i,
-  relationships: /\b(wife|husband|partner|girlfriend|boyfriend|friend|family|parent|kid|child|married|single|mom|dad)\b/i,
-};
-
-const SETBACK_KEYWORDS =
-  /\b(procrastinat|addict|struggle|fail|quit|stop|block|lazy|overwhelm|anxiet|depress|distract|habit|can't|cannot|used to|pattern|relapse|avoid)\b/i;
-
-const LIFE_GOAL_KEYWORDS =
-  /\b(want to|dream|goal|life|future|become|achieve|legacy|vision|aspir|someday|always wanted|my plan|build a|master|learn)\b/i;
 
 /** Foundational habits auto-added when a pillar was never discussed */
 export const PILLAR_DEFAULT_GOALS: Record<
@@ -72,50 +54,55 @@ export const PILLAR_DEFAULT_GOALS: Record<
 };
 
 export function analyzeIntakeCoverage(
-  transcript: { sender: 'user' | 'ai'; text: string }[]
+  transcript: { sender: 'user' | 'ai'; text: string }[] = [],
+  identity?: UserIdentity
 ): IntakeCoverage {
-  const userMessages = transcript.filter((m) => m.sender === 'user').map((m) => m.text);
-  const allUserText = userMessages.join(' ').toLowerCase();
+  const safeTranscript = Array.isArray(transcript) ? transcript : [];
+  const userMessages = safeTranscript.filter((m) => m && m.sender === 'user').map((m) => m.text || '');
   const lastUser = userMessages[userMessages.length - 1] || '';
+  const id = mergeIdentity(identity, heuristicIdentityFromTranscript(safeTranscript, identity));
 
   const pillars = {} as Record<CategoryKey, boolean>;
   for (const key of ALL_PILLARS) {
-    pillars[key] = PILLAR_KEYWORDS[key].some((re) => re.test(allUserText));
+    pillars[key] = Boolean(id.pillarNotes?.[key] && String(id.pillarNotes[key]).trim().length > 2);
   }
 
   const profile = {
-    name: userMessages.length > 0 && userMessages[0].length < 40,
-    location: PROFILE_KEYWORDS.location.test(allUserText),
-    work: PROFILE_KEYWORDS.work.test(allUserText),
-    relationships: PROFILE_KEYWORDS.relationships.test(allUserText),
+    name: Boolean(id.name),
+    location: Boolean(id.city || id.country),
+    work: Boolean(id.work),
+    relationships: Boolean(id.relationships),
   };
 
+  const lifeGoals = (id.lifeGoals || []).length > 0;
+  const setbacks = (id.setbacks || []).length > 0;
+  const dailyCapacity = Boolean(id.dailyCapacity || id.preferredTime);
   const uncoveredPillars = ALL_PILLARS.filter((p) => !pillars[p]);
 
   let nextPriority: IntakeCoverage['nextPriority'] = 'profile';
-  if (!profile.name || (!profile.location && !profile.work && userMessages.length < 2)) {
+  if (!profile.name || (!profile.location && !profile.work)) {
     nextPriority = 'profile';
-  } else if (!LIFE_GOAL_KEYWORDS.test(allUserText) && userMessages.length < 4) {
+  } else if (!lifeGoals) {
     nextPriority = 'lifeGoals';
-  } else if (uncoveredPillars.length > 0 && userMessages.length < 8) {
+  } else if (uncoveredPillars.length > 2) {
     nextPriority = 'pillars';
-  } else if (!SETBACK_KEYWORDS.test(allUserText) && userMessages.length < 10) {
+  } else if (!setbacks) {
     nextPriority = 'setbacks';
-  } else if (
-    !/\b(minute|hour|time|morning|night|evening|schedule|daily|capacity)\b/i.test(allUserText) &&
-    userMessages.length < 12
-  ) {
+  } else if (!dailyCapacity) {
     nextPriority = 'capacity';
   } else {
     nextPriority = 'complete';
   }
 
+  // Extraction can lag a turn; don't stall the funnel forever if they already talked a lot.
+  if (nextPriority !== 'complete' && userMessages.length >= 14) nextPriority = 'complete';
+
   return {
     profile,
-    lifeGoals: LIFE_GOAL_KEYWORDS.test(allUserText),
+    lifeGoals,
     pillars,
-    setbacks: SETBACK_KEYWORDS.test(allUserText),
-    dailyCapacity: /\b(minute|hour|time|morning|night|daily)\b/i.test(allUserText),
+    setbacks,
+    dailyCapacity,
     userTurnCount: userMessages.length,
     lastUserTopic: lastUser.slice(0, 120),
     uncoveredPillars,
@@ -131,7 +118,7 @@ export function buildIntakeCoverageBlock(coverage: IntakeCoverage): string {
   ].filter(Boolean);
 
   return `
-INTAKE STATUS (follow this — do NOT repeat covered topics):
+INTAKE STATUS (follow this — do NOT repeat covered topics. Coverage comes from structured identity, not keyword matching):
 - User turns so far: ${coverage.userTurnCount}
 - Last thing they said (STAY ON THIS TOPIC): "${coverage.lastUserTopic || 'none yet'}"
 - Profile collected: name=${coverage.profile.name}, location=${coverage.profile.location}, work=${coverage.profile.work}, relationships=${coverage.profile.relationships}
@@ -225,7 +212,7 @@ export function ensurePillarCoverage(
       category: pillar,
       reminderTime: def.reminderTime,
       basePoints: 4,
-      targetFrequency: 'daily',
+      targetFrequency: 'weekly',
       effects: [{ category: pillar, weight: 3 }],
       autoAdded: true,
       autoAddedReason: reason,
@@ -235,6 +222,22 @@ export function ensurePillarCoverage(
     });
   }
   return result;
+}
+
+/** Extra pillar fillers become weekly so a new plan never dumps 8 daily habits. */
+export function capDailyPlannedGoals(goals: NormalizedPlannedGoal[], maxDaily = STRUGGLING_CAP): NormalizedPlannedGoal[] {
+  const daily = goals.filter((g) => (g.targetFrequency || 'daily') !== 'weekly');
+  const weekly = goals.filter((g) => g.targetFrequency === 'weekly');
+  if (daily.length <= maxDaily) return goals;
+
+  const keep = daily.slice(0, maxDaily);
+  const overflow = daily.slice(maxDaily).map((g) => ({
+    ...g,
+    targetFrequency: 'weekly' as const,
+    autoAdded: true,
+    autoAddedReason: `${g.autoAddedReason || 'Parked as weekly'} — daily list stays at ${maxDaily} so a rough week cannot dump eight habits.`.trim(),
+  }));
+  return [...keep, ...overflow, ...weekly];
 }
 
 export function linkRoadblocksToGoals(
@@ -272,38 +275,23 @@ export function calibrateBaselines(
 }
 
 export function extractGoalHintsFromTranscript(
-  transcript: { sender: 'user' | 'ai'; text: string }[]
+  transcript: { sender: 'user' | 'ai'; text: string }[] = [],
+  identity?: UserIdentity
 ): { category: CategoryKey; goalType: string }[] {
-  const userText = transcript
-    .filter((m) => m.sender === 'user')
-    .map((m) => m.text)
-    .join(' ');
-  const hints: { category: CategoryKey; goalType: string }[] = [];
-
-  const patterns: { re: RegExp; category: CategoryKey }[] = [
-    { re: /\b(cybersecurity|cyber security|learn to code|programming|study|degree|certification|career)\b/i, category: 'smarts' },
-    { re: /\b(gym|workout|run|fitness|lose weight|muscle|exercise)\b/i, category: 'health' },
-    { re: /\b(meditat|spiritual|gratitude|purpose|faith)\b/i, category: 'spiritual' },
-    { re: /\b(sleep|rest|self.?care|stress|burnout)\b/i, category: 'selfCare' },
-    { re: /\b(happy|hobby|relationship|social|fun)\b/i, category: 'happiness' },
-  ];
-
-  for (const { re, category } of patterns) {
-    const m = userText.match(re);
-    if (m) hints.push({ category, goalType: m[0] });
-  }
-
-  if (hints.length === 0 && userText.length > 20) {
-    hints.push({ category: 'smarts', goalType: userText.slice(0, 80) });
-  }
-  return hints.slice(0, 4);
+  const safe = Array.isArray(transcript) ? transcript : [];
+  const substantial = safe
+    .filter((m) => m && m.sender === 'user')
+    .map((m) => (m.text || '').trim())
+    .filter((t) => t.length >= 24);
+  return substantial.slice(0, 3).map((goalType) => ({ category: 'smarts' as CategoryKey, goalType: goalType.slice(0, 80) }));
 }
 
 export function normalizeBlueprint(
   blueprint: Record<string, unknown>,
-  transcript: { sender: 'user' | 'ai'; text: string }[]
+  transcript: { sender: 'user' | 'ai'; text: string }[] = [],
+  identity?: UserIdentity
 ): Record<string, unknown> {
-  const coverage = analyzeIntakeCoverage(transcript);
+  const coverage = analyzeIntakeCoverage(transcript, identity);
   let plannedGoals = (Array.isArray(blueprint.plannedGoals) ? blueprint.plannedGoals : []) as NormalizedPlannedGoal[];
 
   plannedGoals = plannedGoals
@@ -317,6 +305,7 @@ export function normalizeBlueprint(
     }));
 
   plannedGoals = ensurePillarCoverage(plannedGoals, coverage);
+  plannedGoals = capDailyPlannedGoals(plannedGoals, STRUGGLING_CAP);
 
   const roadblocks = linkRoadblocksToGoals(
     (Array.isArray(blueprint.roadblocks) ? blueprint.roadblocks : []) as NormalizedRoadblock[],

@@ -55,7 +55,8 @@ export function getTasksForDate(
   milestones: Milestone[],
   tasks: PlannedTask[],
   dependencies: GoalDependency[],
-  config: SchedulerConfig
+  config: SchedulerConfig,
+  profile?: BehaviorProfile
 ): PlannedTask[] {
   const graph = buildDependencyGraph(goals, dependencies);
   const completedGoalIds = goals.filter(g => g.planStatus === 'completed').map(g => g.id);
@@ -66,11 +67,21 @@ export function getTasksForDate(
 
   const today = new Date(date);
   const activeGoalIds = new Set(
-    goals.filter(g => !g.archived && g.planStatus !== 'completed').map(g => g.id)
+    goals
+      .filter(
+        (g) =>
+          !g.archived &&
+          g.planStatus !== 'completed' &&
+          g.planStatus !== 'paused' &&
+          g.priority !== 'parking_lot'
+      )
+      .map((g) => g.id)
   );
 
   // Candidates: tasks scheduled today OR overdue recurring tasks
-  const scheduledToday = tasks.filter(t => t.scheduledDate === date && t.status === 'pending');
+  const scheduledToday = tasks.filter(
+    (t) => t.scheduledDate === date && t.status === 'pending' && activeGoalIds.has(t.goalId)
+  );
   const scheduledGoalIds = new Set(scheduledToday.map(t => t.goalId));
   const overdueRecurring = tasks.filter(t =>
     t.isRecurring &&
@@ -89,7 +100,10 @@ export function getTasksForDate(
       const deadline = new Date(milestone.targetDateRange.latest);
       daysUntilDeadline = Math.max(0, Math.floor((deadline.getTime() - today.getTime()) / 86400000));
     }
-    return { task, score: priorityScore(task, daysUntilDeadline, unlockedGoalIds.has(task.goalId)) };
+    let score = priorityScore(task, daysUntilDeadline, unlockedGoalIds.has(task.goalId));
+    if (profile?.engagementTier === 'struggling' && task.hardness <= 2) score += 18;
+    if (profile?.engagementTier === 'disciplined' && task.hardness >= 3) score += 8;
+    return { task, score };
   });
 
   scored.sort((a, b) => b.score - a.score);

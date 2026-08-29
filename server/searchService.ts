@@ -15,11 +15,14 @@ const CATEGORY_RESEARCH_TEMPLATES: Record<string, string> = {
   spiritual: '{goal} mindfulness daily practice habit formation routine',
   selfCare: '{goal} daily routine habit formation self-care protocol',
   happiness: '{goal} behavioral science habit routine wellbeing',
+  wealth: '{goal} self-made realistic years timeline common setbacks compounding habits',
 };
 
 function buildQuery(category: string, goalType: string): string {
-  const template = CATEGORY_RESEARCH_TEMPLATES[category] || '{goal} habit formation daily routine evidence';
-  return `${template.replace('{goal}', goalType)} realistic timeline setbacks recovery fallback steps`;
+  const wealthLike = /millionaire|wealth|financial freedom|rich|net worth/i.test(goalType);
+  const templateKey = wealthLike ? 'wealth' : category;
+  const template = CATEGORY_RESEARCH_TEMPLATES[templateKey] || '{goal} habit formation daily routine evidence';
+  return `${template.replace('{goal}', goalType)} realistic timeline how many years typical setbacks recovery fallback steps`;
 }
 
 // ─── DuckDuckGo (free, no key needed) ───────────────────────────────────────
@@ -120,6 +123,7 @@ const STATIC_KNOWLEDGE: Record<string, string> = {
   spiritual: `Mindfulness habit formation: Start with 5 minutes/day — consistency matters more than duration. Body scan and breath focus are the most research-backed entry points. Link to an existing anchor (morning coffee, bedtime). Gratitude journaling (3 specific items nightly) measurably improves wellbeing at 8 weeks.`,
   selfCare: `Self-care habit formation: Sleep hygiene is the highest-leverage lever — consistent wake times matter more than bedtime. Blue light cutoff 1 hour before sleep. 7-9 hours non-negotiable for mood and cognition. Hydration: 2–3L/day baseline. Habit stack grooming/skincare with teeth brushing anchor.`,
   happiness: `Wellbeing habits: Social connection is the single strongest predictor of long-term happiness (Harvard Study of Adult Development). Aim for one meaningful interaction/day. Contribution activities (helping others) produce lasting mood elevation. Limit social media to <30 min/day. Nature exposure 2x/week shows significant cortisol reduction.`,
+  wealth: `Self-made wealth timelines: building meaningful net worth typically takes 5–15+ years of skill, income, and compounding — not months. Common setbacks: lifestyle inflation, inconsistent skill-building, no emergency fund, chasing shortcuts. Daily habits that move the needle: high-value skill practice, tracking money weekly, delayed spending, and a long skill-to-income pipeline. First years are foundation (skill + income), later years compound.`,
 };
 
 // ─── Main fetch (waterfall: DDG → Serper → Tavily → static) ─────────────────
@@ -135,6 +139,7 @@ export async function fetchGoalResearch(
   serperKey?: string,
   tavilyKey?: string
 ): Promise<ResearchResult> {
+  const wealthLike = /millionaire|wealth|financial freedom|rich|net worth/i.test(goalType);
   const query = buildQuery(category, goalType);
 
   // 1. Try DDG first (free)
@@ -166,7 +171,7 @@ export async function fetchGoalResearch(
   }
 
   // 4. Static fallback (zero cost, always available)
-  const staticFinding = STATIC_KNOWLEDGE[category] || STATIC_KNOWLEDGE.health;
+  const staticFinding = STATIC_KNOWLEDGE[wealthLike ? 'wealth' : category] || STATIC_KNOWLEDGE.health;
   return { findings: staticFinding, source: 'static' };
 }
 

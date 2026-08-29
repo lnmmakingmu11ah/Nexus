@@ -113,8 +113,10 @@ export interface InsightsDigestRequest {
 
 export interface AIChatRequest {
   messages: { sender: 'user' | 'ai'; text: string }[];
+  nexusPersona?: any;
   userContext?: {
     userName?: string;
+    userIdentity?: any;
     lifePathGoal?: string;
     stage?: 'onboarding' | 'open_chat' | 'plan_discussion';
     location?: {
@@ -226,6 +228,95 @@ export const aiClient = {
       ...result,
       messages: Array.isArray(result.messages) ? result.messages : [result.reply],
     };
+  },
+
+  async chatCompanionStream(
+    data: AIChatRequest & { nexusPersona?: any },
+    onDelta: (chunk: string, full: string) => void
+  ): Promise<{ reply: string; messages: string[]; readyForPlan?: boolean; planApproved?: boolean }> {
+    const url = `${getApiBase()}/api/ai/chat-stream`;
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    } catch (err: any) {
+      throw new AiClientError(
+        err?.message?.includes('Failed to fetch') || err?.name === 'TypeError'
+          ? 'Cannot reach AI server. Run: npm run dev'
+          : err?.message || 'Network error talking to AI server',
+        'NETWORK_OFFLINE'
+      );
+    }
+    if (!res.ok || !res.body) {
+      const raw = await res.text();
+      throw new AiClientError(raw || `HTTP ${res.status}`, 'API_ERROR', res.status);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let full = '';
+    let doneMeta: { reply?: string; messages?: string[]; readyForPlan?: boolean; planApproved?: boolean } | null = null;
+
+    const handleEvent = (payload: any) => {
+      if (payload?.type === 'delta' && typeof payload.text === 'string') {
+        full += payload.text;
+        onDelta(payload.text, full);
+      } else if (payload?.type === 'done') {
+        doneMeta = payload;
+      } else if (payload?.type === 'error') {
+        throw new AiClientError(String(payload.error || 'Stream error'), 'API_ERROR');
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+      for (const part of parts) {
+        const line = part.split('\n').find((l) => l.startsWith('data:'));
+        if (!line) continue;
+        try {
+          handleEvent(JSON.parse(line.slice(5).trim()));
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    if (buffer.trim()) {
+      const line = buffer.split('\n').find((l) => l.startsWith('data:'));
+      if (line) {
+        try {
+          handleEvent(JSON.parse(line.slice(5).trim()));
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    const reply = doneMeta?.reply || full;
+    if (!reply) throw new AiClientError('AI returned an empty reply', 'EMPTY_REPLY');
+    return {
+      reply,
+      messages: Array.isArray(doneMeta?.messages) && doneMeta.messages.length ? doneMeta.messages : [reply],
+      readyForPlan: doneMeta?.readyForPlan,
+      planApproved: doneMeta?.planApproved,
+    };
+  },
+
+  async extractIdentity(data: {
+    messages: { sender: 'user' | 'ai'; text: string }[];
+    existingIdentity?: any;
+  }): Promise<{ identity: any }> {
+    return apiFetch('/api/ai/extract-identity', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
 

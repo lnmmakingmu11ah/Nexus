@@ -4,7 +4,11 @@ import { Capacitor } from '@capacitor/core';
 import { UserConfig, AIChatMessage, Goal } from '../types';
 import { aiClient } from '../services/aiClient';
 import { apiOfflineMessage, smartOfflineReply } from '../utils/chatFallback';
+import { bubblesFromStreamBuffer, liveStreamVisible } from '../utils/chatTyping';
 import { AiErrorPanel } from './AiErrorPanel';
+import { mergeIdentity } from '../utils/userIdentity';
+import { ensureNexusPersona } from '../utils/nexusPersona';
+import { UserIdentity } from '../types';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -41,6 +45,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [readyForPlan, setReadyForPlan] = useState(false);
   const [userNameInput, setUserNameInput] = useState('');
   const [isStartingPlan, setIsStartingPlan] = useState(false);
+  const [identity, setIdentity] = useState<UserIdentity | undefined>(initialConfig.userIdentity);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -70,7 +75,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     const partialConfig: UserConfig = {
       ...initialConfig,
       onboarded: true,
-      userName: userNameInput || 'Friend',
+      userName: userNameInput || identity?.name || 'Friend',
+      userIdentity: identity,
+      nexusPersona: ensureNexusPersona(initialConfig.nexusPersona),
       lifePathGoal: 'Live with wisdom, focus, physical strength, and purpose',
       masterBlueprint: undefined,
       aiChatHistory: [],
@@ -112,31 +119,87 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     setIsTyping(true);
 
     try {
-      const res = await aiClient.chatCompanion({
-        messages: newMessages.map((m) => ({ sender: m.sender, text: m.text })),
-        userContext: { stage: 'onboarding', userName: userNameInput || undefined },
-      });
+      const liveId = `ai-live-${Date.now()}`;
+      const res = await aiClient.chatCompanionStream(
+        {
+          messages: newMessages.map((m) => ({ sender: m.sender, text: m.text })),
+          nexusPersona: ensureNexusPersona(initialConfig.nexusPersona),
+          userContext: {
+            stage: 'onboarding',
+            userName: userNameInput || identity?.name || undefined,
+            userIdentity: identity,
+          },
+        },
+        (_chunk, full) => {
+          const { closed, current } = bubblesFromStreamBuffer(full);
+          const liveText = liveStreamVisible(current);
+          setChatMessages((prev) => {
+            const withoutThisTurnAi = prev.filter(
+              (m) => m.id !== liveId && !m.id.startsWith(`${liveId}-c`)
+            );
+            const closedBubbles: AIChatMessage[] = closed
+              .map((b, i) => ({
+                id: `${liveId}-c${i}`,
+                sender: 'ai' as const,
+                text: stripPlanToken(b),
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              }))
+              .filter((b) => b.text);
+            const next = [...withoutThisTurnAi, ...closedBubbles];
+            if (liveText) {
+              next.push({
+                id: liveId,
+                sender: 'ai',
+                text: liveText,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              });
+            }
+            return next;
+          });
+          // Typing indicator stays until the stream fully completes (cleared in finally)
+        }
+      );
 
       setBrainOffline(false);
       setLastAiError(null);
       if (res.readyForPlan) setReadyForPlan(true);
 
-      const bubbles: string[] = (res.messages && res.messages.length > 0)
-        ? res.messages
-        : [res.reply];
-
-      for (let i = 0; i < bubbles.length; i++) {
-        if (i > 0) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 650 + Math.random() * 650));
-        }
-        const bubble: import('../types').AIChatMessage = {
-          id: `ai-${Date.now()}-${i}`,
-          sender: 'ai',
-          text: stripPlanToken(bubbles[i]),
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        setChatMessages((prev) => [...prev, bubble]);
+      const finalBubbles = (res.messages && res.messages.length > 0 ? res.messages : [res.reply])
+        .map((b) => stripPlanToken(b))
+        .filter(Boolean);
+      if (finalBubbles.length) {
+        setChatMessages((prev) => {
+          const withoutThisTurnAi = prev.filter(
+            (m) => m.id !== liveId && !m.id.startsWith(`${liveId}-c`)
+          );
+          return [
+            ...withoutThisTurnAi,
+            ...finalBubbles.map((textOut, i) => ({
+              id: `${liveId}-f${i}`,
+              sender: 'ai' as const,
+              text: textOut,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            })),
+          ];
+        });
       }
+
+      const extractMsgs = [
+        ...newMessages.map((m) => ({ sender: m.sender, text: m.text })),
+        ...finalBubbles.map((text) => ({ sender: 'ai' as const, text })),
+      ];
+      aiClient
+        .extractIdentity({ messages: extractMsgs.slice(-16), existingIdentity: identity })
+        .then((r) => {
+          if (r?.identity) {
+            setIdentity((prev) => {
+              const merged = mergeIdentity(prev, r.identity);
+              if (merged.name && !userNameInput) setUserNameInput(merged.name);
+              return merged;
+            });
+          }
+        })
+        .catch(() => {});
     } catch (err: any) {
       console.error('Onboarding chat error:', err);
       setBrainOffline(true);
@@ -164,7 +227,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     const partialConfig: UserConfig = {
       ...initialConfig,
       onboarded: true,
-      userName: userNameInput || 'Friend',
+      userName: userNameInput || identity?.name || 'Friend',
+      userIdentity: identity,
+      nexusPersona: ensureNexusPersona(initialConfig.nexusPersona),
       lifePathGoal: 'Achieve daily growth and balance across physical, cognitive, and purpose goals',
       aiChatHistory: [],
       tutorialCompleted: false,
@@ -188,7 +253,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 Goal Scout <span className="text-amber-400 font-mono text-[10px]">1-time setup</span>
               </h2>
               <p className="text-[11px] text-zinc-400 font-light truncate">
-                {brainOffline ? 'Offline mode' : 'Talk with NEXUS â€” plan builds in the background'}
+                {brainOffline ? 'Offline mode' : 'Talk with NEXUS — plan builds in the background'}
               </p>
             </div>
           </div>

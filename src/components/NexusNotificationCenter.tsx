@@ -201,6 +201,22 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
       });
     }
 
+    (userConfig.adaptiveWarnings || []).slice(-6).forEach((warning) => {
+      generated.push({
+        id: `timeline-${warning.id}`,
+        type: warning.direction === 'slipped' ? 'decay' : 'win',
+        title: warning.direction === 'slipped' ? `Timeline slipped: ${warning.goalName}` : `Timeline improved: ${warning.goalName}`,
+        message: warning.message,
+        actionTag: warning.direction === 'slipped' ? 'Do a tiny step' : 'Keep going',
+        goalId: warning.goalId,
+        goalName: warning.goalName,
+        timestamp: new Date(warning.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timeContext: timeInfo.label,
+        read: warning.read,
+        dismissed: false,
+      });
+    });
+
     // Filter out locally dismissed nudge IDs
     const filtered = generated.filter((n) => !dismissedIds.has(n.id));
     setNudges(filtered);

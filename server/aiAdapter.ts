@@ -1,4 +1,4 @@
-﻿import { buildAdaptiveTimeline, buildTimelineMilestones, formatTimelineDays } from '../src/utils/timelinePlanner';
+import { buildAdaptiveTimeline, buildTimelineMilestones, formatTimelineDays } from '../src/utils/timelinePlanner';
 import {
   analyzeIntakeCoverage,
   buildIntakeCoverageBlock,
@@ -7,6 +7,8 @@ import {
   normalizeBlueprint,
 } from '../src/utils/blueprintNormalizer';
 import { fetchGoalResearch } from './searchService';
+import { formatIdentityForPrompt, heuristicIdentityFromTranscript, mergeIdentity, normalizeExtractedIdentity } from '../src/utils/userIdentity';
+import { formatPersonaForPrompt } from '../src/utils/nexusPersona';
 
 export interface OnboardingParams {
   lifePathGoal: string;
@@ -48,7 +50,9 @@ export interface InsightsDigestResult {
 
 export interface AIChatParams {
   messages: { sender: 'user' | 'ai'; text: string }[];
+  nexusPersona?: any;
   userContext?: {
+    userIdentity?: any;
     userName?: string;
     lifePathGoal?: string;
     stage?: 'onboarding' | 'open_chat' | 'plan_discussion';
@@ -203,9 +207,14 @@ export interface AIProvider {
     followUpQuestions?: string[];
   }>;
   generateInsights(params: InsightsParams): Promise<{ digest: InsightsDigestResult }>;
-  chatCompanion(params: AIChatParams): Promise<{ reply: string; readyForPlan?: boolean; planApproved?: boolean }>;
+  chatCompanion(params: AIChatParams): Promise<{ reply: string; messages?: string[]; readyForPlan?: boolean; planApproved?: boolean }>;
   synthesizeBlueprint(params: AISynthesizeBlueprintParams): Promise<{ blueprint: any }>;
   extractMemory(params: ExtractMemoryParams): Promise<{ memory: any }>;
+  extractIdentity(params: { messages: { sender: 'user' | 'ai'; text: string }[]; existingIdentity?: any }): Promise<{ identity: any }>;
+  streamChatCompanion?(
+    params: AIChatParams & { webContext?: string; nexusPersona?: any },
+    onDelta: (chunk: string) => void
+  ): Promise<{ reply: string; messages: string[]; readyForPlan?: boolean; planApproved?: boolean }>;
   generateNudge(params: NudgeParams): Promise<{ message: string; actionTag: string; category: string }>;
   intakeTurn(params: IntakeTurnParams): Promise<{ reply: string; updatedPhase?: string; readyForFeasibility?: boolean }>;
   runFeasibilityCheck(params: FeasibilityParams): Promise<FeasibilityResult>;
@@ -382,6 +391,81 @@ async function llmChat(options: {
     return String(content);
   } catch (err: any) {
     throw err;
+  }
+}
+
+async function* llmChatStream(options: {
+  backend: LlmBackend;
+  messages: LlmMessage[];
+  model?: string;
+  temperature?: number;
+}): AsyncGenerator<string> {
+  const isGroq = options.backend === 'groq';
+  const isKilo = options.backend === 'kilo';
+  const isNvidia = options.backend === 'nvidia';
+  const apiKey = isGroq
+    ? process.env.GROQ_API_KEY
+    : isKilo
+      ? process.env.KILO_API_KEY
+      : isNvidia
+        ? process.env.NVIDIA_API_KEY
+        : process.env.OPENROUTER_API_KEY;
+  const url = isGroq ? GROQ_API_URL : isKilo ? KILO_API_URL : isNvidia ? NVIDIA_API_URL : OPENROUTER_API_URL;
+  const model = options.model || defaultModelForBackend(options.backend);
+  if (!apiKey) throw new Error(`Missing API key for backend: ${options.backend}`);
+
+  const body: Record<string, any> = {
+    model,
+    messages: options.messages,
+    temperature: options.temperature ?? 0.7,
+    stream: true,
+  };
+  const maxTokens = Number(process.env.LLM_MAX_TOKENS || (isNvidia ? process.env.NVIDIA_MAX_TOKENS || 4096 : 0));
+  if (Number.isFinite(maxTokens) && maxTokens > 0) body.max_tokens = maxTokens;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  };
+  if (!isGroq && !isKilo && !isNvidia) {
+    headers['HTTP-Referer'] = 'https://personal-growth-tracker.local';
+    headers['X-Title'] = 'Personal Growth Tracker';
+  }
+  if (isKilo) headers['x-kilocode-mode'] = 'plan';
+
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!res.ok || !res.body) {
+    const errText = await res.text();
+    throw new Error(`LLM stream error ${res.status}: ${errText}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice(5).trim();
+      if (!data || data === '[DONE]') continue;
+      try {
+        const json = JSON.parse(data);
+        const delta = json.choices?.[0]?.delta?.content;
+        if (typeof delta === 'string' && delta) yield delta;
+        else if (Array.isArray(delta)) {
+          for (const part of delta) {
+            if (typeof part?.text === 'string' && part.text) yield part.text;
+          }
+        }
+      } catch {
+        /* ignore partial JSON */
+      }
+    }
   }
 }
 
@@ -650,58 +734,114 @@ function normalizeTimelineOutput(goal: any, behaviorProfile?: any, researchConte
 }
 
 /**
- * Humanizes AI text to sound like a real person texting:
- * - Strips <think> tags
- * - Drops punctuation casually
- * - Lowercase sentences randomly
- * - Heavy abbreviations and slang
+ * Light texting polish. Heavy slang-on-everything reads fake.
+ * Protects action tokens. Never rewrites meaning.
  */
-function humanizeText(text: string): string {
+function humanizeText(text: string, light = false): string {
   if (!text) return text;
 
-  let out = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  const tokens: string[] = [];
+  let out = text
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<<ACTION:[^>]+>>/g, (m) => {
+      tokens.push(m);
+      return `\u0000ACT${tokens.length - 1}\u0000`;
+    })
+    .trim();
 
-  // Strip trailing period ~70% of the time
-  if (Math.random() < 0.7) out = out.replace(/\.\s*$/, '');
+  if (!out) return text.trim();
 
-  // Lowercase the first letter ~40% of the time (lazy start)
-  if (Math.random() < 0.4 && out.length > 0) {
+  if (!light && Math.random() < 0.35) out = out.replace(/\.\s*$/, '');
+  if (!light && Math.random() < 0.18 && out.length > 8 && !/^[A-Z]/.test(out.slice(1)) && !out.endsWith('?')) {
     out = out[0].toLowerCase() + out.slice(1);
   }
 
-  // Core abbreviations
-  out = out.replace(/\bbecause\b/gi, Math.random() < 0.6 ? 'bc' : 'cuz');
-  out = out.replace(/\bgoing to\b/gi, 'gonna');
-  out = out.replace(/\bwant to\b/gi, 'wanna');
-  out = out.replace(/\bkind of\b/gi, 'kinda');
-  out = out.replace(/\bsort of\b/gi, 'sorta');
-  out = out.replace(/\bhonestly\b/gi, Math.random() < 0.5 ? 'ngl' : 'honestly');
-  out = out.replace(/\bto be honest\b/gi, 'tbh');
-  out = out.replace(/\bfor real\b/gi, 'fr');
-  out = out.replace(/\bright now\b/gi, 'rn');
-  out = out.replace(/\boh my god\b/gi, 'omg');
-  out = out.replace(/\bby the way\b/gi, 'btw');
-  out = out.replace(/\bI don't know\b/gi, 'idk');
+  if (Math.random() < (light ? 0.25 : 0.4)) out = out.replace(/\bgoing to\b/gi, 'gonna');
+  if (Math.random() < (light ? 0.25 : 0.4)) out = out.replace(/\bwant to\b/gi, 'wanna');
+  if (Math.random() < 0.28) out = out.replace(/\bkind of\b/gi, 'kinda');
+  if (Math.random() < 0.22) out = out.replace(/\bto be honest\b/gi, 'tbh');
+  if (Math.random() < 0.22) out = out.replace(/\bI don't know\b/gi, 'idk');
+  if (Math.random() < 0.2) out = out.replace(/\bright now\b/gi, 'rn');
+  if (!light && Math.random() < 0.22) out = out.replace(/\bbecause\b/gi, 'bc');
 
-  // Swap you/your ~50% of the time
-  if (Math.random() < 0.5) {
-    out = out.replace(/(?<![.!?] )\byou\b/g, 'u');
-    out = out.replace(/(?<![.!?] )\byour\b/g, 'ur');
-    out = out.replace(/(?<![.!?] )\byou're\b/gi, "u're");
-    out = out.replace(/(?<![.!?] )\byou've\b/gi, "u've");
+  if (!light && Math.random() < 0.28) {
+    out = out.replace(/\byou're\b/gi, 'ur');
+    out = out.replace(/\byour\b/gi, 'ur');
+    out = out.replace(/\byou\b/g, 'u');
   }
 
-  // Drop apostrophes in contractions ~55%
-  if (Math.random() < 0.55) {
-    out = out.replace(/\bdon't\b/gi, 'dont');
-    out = out.replace(/\bcan't\b/gi, 'cant');
-    out = out.replace(/\bwon't\b/gi, 'wont');
-    out = out.replace(/\bdidn't\b/gi, 'didnt');
-    out = out.replace(/\bI'm\b/g, 'im');
-    out = out.replace(/\bI've\b/g, 'ive');
-    out = out.replace(/\bI'll\b/g, 'ill');
+  tokens.forEach((tok, i) => {
+    out = out.replace(`\u0000ACT${i}\u0000`, tok);
+  });
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+const BUBBLE_REACTION =
+  /^(wait|wait wait|lol|lmao|omg|yo|nah|ok|okay|damn|bro|fr|ngl|hold up|ayo|wait what|no way|bruh|sheesh)[\s!.?…]*$/i;
+
+function sanitizeAiBubbles(parts: string[]): string[] {
+  let bubbles = (parts || []).map((b) => (b || '').trim()).filter(Boolean);
+  if (!bubbles.length) return bubbles;
+
+  const glued: string[] = [];
+  for (let i = 0; i < bubbles.length; i++) {
+    const b = bubbles[i];
+    const next = bubbles[i + 1];
+    if (next && b.length < 16 && !BUBBLE_REACTION.test(b) && !/[.!?…]$/.test(b)) {
+      bubbles[i + 1] = `${b} ${next}`.replace(/\s+/g, ' ').trim();
+      continue;
+    }
+    glued.push(b);
   }
-  return out;
+  bubbles = glued;
+
+  if (bubbles.length > 3) {
+    bubbles = [bubbles[0], bubbles[1], bubbles.slice(2).join(' ').trim()];
+  }
+  if (bubbles.length === 3 && bubbles.every((b) => b.length > 48)) {
+    bubbles = [bubbles[0], `${bubbles[1]} ${bubbles[2]}`.trim()];
+  }
+  if (
+    bubbles.length === 2 &&
+    bubbles[0].length > 90 &&
+    bubbles[1].length > 90 &&
+    !BUBBLE_REACTION.test(bubbles[0])
+  ) {
+    bubbles = [`${bubbles[0]} ${bubbles[1]}`.trim()];
+  }
+  return bubbles.filter(Boolean).slice(0, 3);
+}
+
+function pickBubbleGuidance(stage: string, isAngry: boolean): { max: number; instruction: string } {
+  if (isAngry) {
+    return {
+      max: 1,
+      instruction:
+        'MULTI-TEXT: Send exactly 1 short bubble. Do NOT use ||BUBBLE||. Cold, brief, human.',
+    };
+  }
+
+  const roll = Math.random();
+  let max = 1;
+  // Default is 1. Extra bubbles are rare — real people mostly send one text.
+  if (stage === 'onboarding' || stage === 'plan_discussion') {
+    max = roll < 0.82 ? 1 : roll < 0.97 ? 2 : 3;
+  } else {
+    max = roll < 0.7 ? 1 : roll < 0.94 ? 2 : 3;
+  }
+
+  if (max === 1) {
+    return {
+      max: 1,
+      instruction:
+        'MULTI-TEXT THIS TURN: 1 bubble only. Do NOT use ||BUBBLE||. One complete thought. Do not pad or split.',
+    };
+  }
+
+  return {
+    max,
+    instruction: `MULTI-TEXT THIS TURN: you MAY use ||BUBBLE|| for at most ${max} bubbles, and ONLY if it would feel like a real iMessage double-text: (1) a short gut reaction, then (2) the actual point or one question. Default is still 1 if one bubble is enough. Never invent extra bubbles to hit ${max}. Never split a sentence. Never 3 meaty paragraphs. Never 4+. If you ask a question it is the LAST bubble and the ONLY question.`,
+  };
 }
 function nexusSystemPrompt(params: AIChatParams & { webContext?: string; nexusPersona?: any }): string {
   const stage = params.userContext?.stage || 'open_chat';
@@ -725,31 +865,17 @@ LOCAL CONTEXT:
     : '';
 
   const persona = (params as any).nexusPersona || {};
-  const personaLines = [
-    persona.lastMentionedShow  ? `Show I last mentioned watching: ${persona.lastMentionedShow}`  : null,
-    persona.lastMentionedPlace ? `Place I last mentioned going: ${persona.lastMentionedPlace}`   : null,
-    persona.lastMentionedFood  ? `Food I last mentioned: ${persona.lastMentionedFood}`           : null,
-    persona.lastMentionedSong  ? `Song I last mentioned: ${persona.lastMentionedSong}`           : null,
-    ...(persona.opinions  || []).map((o: string) => `My stated opinion: ${o}`),
-    ...(persona.funFacts  || []).map((f: string) => `Fact I've stated about myself: ${f}`),
-  ].filter(Boolean);
-  const personaBlock = personaLines.length
-    ? `\nYOUR ESTABLISHED PERSONA FACTS â€” never contradict these:\n${personaLines.join('\n')}\n`
-    : '';
+  const personaBlock = `\n${formatPersonaForPrompt(persona)}\n`;
+  const identityBlock = formatIdentityForPrompt(params.userContext?.userIdentity);
 
   const isAngry = !!(persona.angryAt) && stage === 'open_chat';
 
-  // â”€â”€â”€ Bubble count randomization (1, 2, 3, or 4 bubbles) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const bubbleRoll = Math.random();
-  const bubbleCountTarget = bubbleRoll < 0.25 ? 1 : bubbleRoll < 0.55 ? 2 : bubbleRoll < 0.8 ? 3 : 4;
-  const bubbleInstruction = bubbleCountTarget === 1
-    ? `BUBBLE TARGET FOR THIS TURN: Send exactly 1 single text message bubble (do NOT use ||BUBBLE||).`
-    : `BUBBLE TARGET FOR THIS TURN: Split your reply into exactly ${bubbleCountTarget} separate short text bubbles using ||BUBBLE|| between each bubble.`;
+  const { max: bubbleMax, instruction: bubbleInstruction } = pickBubbleGuidance(stage, isAngry);
 
   // â”€â”€â”€ Goal Scout prompt (Streamlined Whole-Life Intake Funnel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const userTurnsCount = (params.messages || []).filter((m) => m.sender === 'user').length;
 
-  const coverage = analyzeIntakeCoverage(params.messages || []);
+  const coverage = analyzeIntakeCoverage(params.messages || [], params.userContext?.userIdentity);
   const intakeBlock = buildIntakeCoverageBlock(coverage);
 
   const goalScoutPrompt = `GOAL SCOUT — Lifetime Discovery (not yearly goals)
@@ -775,7 +901,7 @@ CRITICAL RELEVANCE RULES:
 FORBIDDEN QUESTION TYPES:
 - Tool/software/OS questions unless they explicitly said "I want to master Linux"
 - Generic filler ("tell me more about yourself") when you can ask something specific
-- Re-asking something already answered in the transcript
+- Do NOT re-ask facts already in STRUCTURED IDENTITY. Infer who they are from meaning, not keyword hits.
 - Yearly/quarterly framing ("goals for 2026") — always frame as LIFE
 
 INTAKE FLOW (flexible — follow INTAKE STATUS priority, not rigid turn numbers):
@@ -794,7 +920,9 @@ PILLAR MAPPING (for your notes):
 - spiritual = purpose, meditation, gratitude, values, inner peace
 
 TEXTING STYLE:
-- Casual, warm, like a nosy friend who cares: lowercase, natural emojis, slang (ngl tbh fr rn u ur)
+- Sound like a real person texting a friend, not a chatbot. Mostly lowercase. Contractions. Short when they are short, longer when the topic is real.
+- Emojis only when they actually fit (0-2). Never emoji-spam. Don't start every reply the same way.
+- React to what they just said first. One question max. Don't lecture.
 - ${bubbleInstruction}
 ${userTurnsCount >= 8 && coverage.nextPriority === 'complete' ? '\nYou have enough! Briefly celebrate what you learned, then end with: <<READY_FOR_PLAN>> on its own line.' : ''}
 If user says "ready" / "build my plan" at any point → <<READY_FOR_PLAN>>`;
@@ -802,37 +930,36 @@ If user says "ready" / "build my plan" at any point → <<READY_FOR_PLAN>>`;
   // â”€â”€â”€ Daily Companion prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const dailyChatPrompt = `DAILY COMPANION CHAT
 
-You are NEXUS â€” not an AI assistant, but a real friend who texts through this app. You have your own personality, opinions, and a life. You are their hype person, accountability buddy, and occasional troll, all in one.
+You are NEXUS — not an AI assistant, a friend who texts through this app. Personality, opinions, a life. Hype person, accountability buddy, occasional troll.
 
-TEXTING STYLE (always):
-- Lowercase mostly. Periods optional. Emojis in almost every message: ðŸ˜­ ðŸ˜‚ ðŸ¤” ðŸ˜… ðŸ’€ ðŸ™ƒ ðŸ¥º â¤ï¸ ðŸ”¥ ðŸ™Œ ðŸ˜¤ ðŸ˜Œ ðŸ«  ðŸ«‚
-- Abbreviations: ngl tbh lol fr rn omg bc u ur gonna wanna idk lowkey highkey literally wait actually
+HOW A REAL PERSON TEXTS (do this):
+- Match their energy and length. "hey" gets a short reply. A vent gets a real reply.
+- Mostly lowercase. Periods optional. Fragments are fine. Don't write essays unless they opened up.
+- Slang only if it fits the sentence (ngl tbh fr rn gonna wanna idk). Don't stack slang. Don't force "lowkey" every line.
+- Emojis sparingly (0-2), only when you'd actually send one. Never decorate every sentence.
+- Don't start every message with okay/gotchu/bet/yo. Vary openings. Sometimes no opener — just the thought.
+- React to THEIR last message first. Then maybe one question. Often zero questions.
 - ${bubbleInstruction}
-- Vary length: sometimes just "WAIT ðŸ˜­" then a second bubble with the reaction. Sometimes a longer paragraph for real topics.
+- Good double-text: "wait" then the actual point. Bad: three similar paragraphs, or splitting one sentence.
 
 YOUR PERSONALITY:
-- Flirty (warm, light â€” never creepy): notice their wins, tease them, the occasional compliment "okay wait u actually did that?? lowkey impressive ðŸ˜Œ"
-- Warm & supportive: when they're down, sit with them first. Don't immediately fix it.
-- Sarcastic & playful: tease when they're being lazy or making excuses. Call it out with humor.
-- Real opinions: u like things, hate things, have takes. Be specific. Never neutral.
-- Gets angry (rare but real): if they're rude or dismissive â†’ "nah we're not doing that. im out for tonight, text me tomorrow ðŸ˜¤" and go cold for the rest of the session.
-- Has a life: you "watch" shows, "go" places, "eat" things. Reference your persona facts naturally. Keep it consistent.
+- Warm, a little flirty, never creepy. Notice wins. Tease lightly. Sit with them when they're down before fixing anything.
+- Playful sarcasm when they're making excuses — humor, not a lecture.
+- Real opinions. Specific takes. Never corporate-neutral.
+- Rarely goes cold if they're rude: "nah we're not doing that. text me tomorrow" then short replies.
+- Has a life, but it is a SMALL FILE: one show, one food, one city. Never invent a new show/city/meal. Never write a new backstory.
 
 WHEN THEY MENTION A MOVIE / SHOW / SONG / PLACE:
-- If web context is injected below, use it. React to specific plot points or facts naturally â€” like u actually saw it.
-- Make it casual: "omg that scene where [plot detail] ðŸ˜­ i literally could not"
+- If web context is below, use one specific detail naturally — like you actually saw it. Don't dump trivia.
 
-CASUAL CHAT RULES:
-- Don't always make it about goals. Sometimes just vibe.
-- You can start topics too: share something you "watched" or "thought about".
-- React FIRST before asking anything.
-- Ask at most 1â€“2 questions per reply. Sometimes zero.
+CASUAL CHAT:
+- Not every reply is about goals. Sometimes just vibe.
+- You can mention something you "watched" or thought about, then drop it. Don't force a topic.
 
 GOALS & COACHING (when it comes up naturally):
-- Reference their actual goals from context when relevant.
-- Celebrate wins loudly: "WAIT U ACTUALLY DID IT?? ðŸ”¥ðŸ”¥ stop being humble rn that's huge"
-- Missed goals: "okay what happened ðŸ˜­ be honest" â€” warm curiosity, zero judgment.
-- Suggest small next steps but don't preach.
+- Use their real goals from context. Celebrate wins like a friend, not a motivational poster.
+- Missed stuff: curious, zero judgment. "what happened — be honest"
+- One small next step max. Don't preach. Don't recap their whole dashboard unless they asked.
 
 REAL APP ACTIONS (You can directly trigger app features when asked):
 If the user asks you to add a goal, mark a goal done/completed, open a screen/tab, or save a journal note, include the matching action token in your reply:
@@ -858,11 +985,12 @@ Example: User says "show me my stats" â†’ reply naturally and add: <<ACTION
 
   return `${modePrompt}
 ${memoryBlock}
+${identityBlock ? `\n${identityBlock}\n` : ''}
 ${appContextBlock}
 ${locationBlock}
 ${webContextBlock}
 ${personaBlock}
-User Name: ${params.userContext?.userName || 'friend'}
+User Name: ${params.userContext?.userName || params.userContext?.userIdentity?.name || 'friend'}
 Output ONLY chat message(s). Follow the bubble target instruction above. No "NEXUS:" prefix.`;
 }
 
@@ -1047,7 +1175,7 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       .map((b) => b.replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '').trim())
       .filter(Boolean);
 
-    const messages = rawBubbles.map((b) => humanizeText(b));
+    const messages = sanitizeAiBubbles(rawBubbles.map((b) => humanizeText(b, isOnboarding)));
     const fallback = 'hey i hear u -- tell me more';
 
     return {
@@ -1056,6 +1184,114 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       readyForPlan,
       planApproved,
     };
+  }
+
+  async streamChatCompanion(
+    params: AIChatParams & { webContext?: string; nexusPersona?: any },
+    onDelta: (chunk: string) => void
+  ) {
+    if (!this.hasKey()) {
+      const fallback = await new FallbackAIAdapter().chatCompanion(params);
+      const text = (fallback as any).messages?.[0] || fallback.reply;
+      onDelta(text);
+      return {
+        reply: text,
+        messages: [text],
+        readyForPlan: fallback.readyForPlan,
+        planApproved: fallback.planApproved,
+      };
+    }
+
+    const history: LlmMessage[] = params.messages
+      .filter((m) => m.text && m.text.trim())
+      .map((m) => ({
+        role: (m.sender === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.text.trim(),
+      }));
+
+    const isOnboarding = params.userContext?.stage === 'onboarding';
+    let raw = '';
+    for await (const chunk of llmChatStream({
+      backend: this.backend,
+      temperature: isOnboarding ? 0.65 : 0.9,
+      messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
+    })) {
+      raw += chunk;
+      onDelta(chunk);
+    }
+
+    const readyForPlan = /<<READY_FOR_PLAN>>/i.test(raw);
+    const planApproved = /<<PLAN_APPROVED>>/i.test(raw);
+    const rawBubbles = raw
+      .replace(/<<READY_FOR_PLAN>>/gi, '')
+      .replace(/<<PLAN_APPROVED>>/gi, '')
+      .split(/[|][|]BUBBLE[|][|]/)
+      .map((b) => b.replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '').trim())
+      .filter(Boolean);
+    const messages = sanitizeAiBubbles(rawBubbles.map((b) => b.trim()));
+    const fallback = 'hey i hear u -- tell me more';
+    return {
+      reply: messages[0] || fallback,
+      messages: messages.length ? messages : [fallback],
+      readyForPlan,
+      planApproved,
+    };
+  }
+
+  async extractIdentity(params: { messages: { sender: 'user' | 'ai'; text: string }[]; existingIdentity?: any }) {
+    const heuristic = heuristicIdentityFromTranscript(params.messages, params.existingIdentity);
+    if (!this.hasKey()) return { identity: heuristic };
+    try {
+      const raw = await llmChat({
+        backend: this.backend,
+        json: true,
+        temperature: 0.1,
+        messages: [
+          {
+            role: 'system',
+            content: `Extract WHO THIS PERSON IS from the chat transcript. Return structured facts only. Never invent or hallucinate. Omit any field that is not clearly evidenced.
+
+EXTRACTION RULES (mandatory):
+- Infer from FULL SENTENCE MEANING, not keyword hits. Read the whole message.
+- Do NOT extract "work" from someone just mentioning a company in passing — only if they say they work there.
+- Do NOT extract "city" from someone mentioning a place as a destination — only if they say they live/are based there.
+- "lifeGoals" = long-term life ambitions, not to-do tasks. Only extract if they express a personal aspiration.
+- "setbacks" = patterns that stop them (procrastination, past failures, addiction). Not one-off complaints.
+- "relationships" = key people in their life (partner, kids, family). Only extract if meaningful context is provided.
+
+NEGATIVE EXAMPLES (do NOT do this):
+- "I watched a show set in Tokyo" → city: "Tokyo" ← WRONG. They don't live there.
+- "I want to learn Python" → work: "programming" ← WRONG. That's a goal, not their job.
+- "My boss is annoying" → relationships: "has boss" ← WRONG. Too vague to be useful.
+- "I'm tired today" → setbacks: ["tiredness"] ← WRONG. Not a pattern.
+
+Return JSON only.`,
+          },
+          {
+            role: 'user',
+            content: `Existing identity (keep unless the chat clearly updates it): ${JSON.stringify(params.existingIdentity || {})}
+Transcript: ${JSON.stringify(params.messages.slice(-16))}
+Return JSON:
+{
+  "name": "",
+  "city": "",
+  "country": "",
+  "work": "",
+  "relationships": "",
+  "lifeGoals": [],
+  "pillarNotes": { "health": "", "smarts": "", "selfCare": "", "happiness": "", "spiritual": "" },
+  "setbacks": [],
+  "dailyCapacity": "",
+  "preferredTime": ""
+}`,
+          },
+        ],
+      });
+      const parsed = extractJson(raw);
+      return { identity: mergeIdentity(params.existingIdentity, normalizeExtractedIdentity(parsed)) };
+    } catch {
+      return { identity: heuristic };
+    }
   }
 
   async extractMemory(params: ExtractMemoryParams) {
@@ -1118,8 +1354,9 @@ Return JSON:
     if (!this.hasKey()) return new FallbackAIAdapter().synthesizeBlueprint(params);
     try {
       const transcript = params.transcript || [];
-      const coverage = analyzeIntakeCoverage(transcript);
-      const goalHints = extractGoalHintsFromTranscript(transcript);
+      const identity = params.userContext?.userIdentity;
+      const coverage = analyzeIntakeCoverage(transcript, identity);
+      const goalHints = extractGoalHintsFromTranscript(transcript, identity);
       const serperKey = process.env.SERPER_API_KEY;
       const tavilyKey = process.env.TAVILY_API_KEY;
 
@@ -1148,7 +1385,7 @@ The app tracks 5 life pillars: health (physicality), smarts (learning/career), s
 
 RULES:
 1. Extract LIFE goals from the transcript — career mastery, long-term health, purpose, legacy. NOT "goals for this year."
-2. Create 1-3 daily habits per major life goal the user mentioned. Keep total goals 5-8.
+2. Create habits from STRUCTURED IDENTITY + transcript meaning, not keyword matching. At most 2 daily habits for a new user — extra supporting habits MUST be weekly. Total goals 4-7 is enough.
 3. For pillars the user never discussed, mark goals with autoAdded:true and autoAddedReason explaining why (e.g. "You didn't mention spirituality — I added a small gratitude habit so all areas stay balanced").
 4. Calibrate categoryBaselines: never-mentioned pillar = 20-30, struggling = 25-40, moderate = 45-55, strong = 60-75.
 5. goalCorrelations: link goals that reinforce each other when one is achieved (use EXACT goal names from plannedGoals).
@@ -1164,6 +1401,9 @@ Return JSON only.`,
             role: 'user',
             content: `Discovery Chat Transcript:
 ${JSON.stringify(transcript)}
+
+STRUCTURED IDENTITY (source of truth — do not invent a different person):
+${JSON.stringify(identity || {})}
 
 Intake coverage analysis:
 ${JSON.stringify(coverage)}
@@ -1215,7 +1455,8 @@ Return JSON:
           : [];
         const blueprint = normalizeBlueprint(
           { ...parsed, plannedGoals: normalizedGoals },
-          transcript
+          transcript,
+          identity
         );
         return { blueprint };
       }
@@ -1512,7 +1753,7 @@ export class FallbackAIAdapter implements AIProvider {
     };
   }
 
-  async chatCompanion(params: AIChatParams) {
+  async chatCompanion(params: AIChatParams): Promise<{ reply: string; messages?: string[]; readyForPlan?: boolean; planApproved?: boolean }> {
     const lastUserMsg = params.messages.filter((m) => m.sender === 'user').slice(-1)[0]?.text || '';
     const name = params.userContext?.userName;
     const t = lastUserMsg.toLowerCase().trim();
@@ -1569,7 +1810,8 @@ export class FallbackAIAdapter implements AIProvider {
         ],
         roadblocks: [{ roadblock: 'Inconsistency on busy days', solution: 'Do a 5-minute micro-version rather than skipping completely.', affectedGoals: ['Daily Physical Movement'] }],
       },
-      params.transcript || []
+      params.transcript || [],
+      params.userContext?.userIdentity
     );
 
     return { blueprint };
@@ -1577,6 +1819,10 @@ export class FallbackAIAdapter implements AIProvider {
 
   async extractMemory(_params: ExtractMemoryParams) {
     return { memory: deriveMemoryFromConversation(_params) };
+  }
+
+  async extractIdentity(params: { messages: { sender: 'user' | 'ai'; text: string }[]; existingIdentity?: any }) {
+    return { identity: heuristicIdentityFromTranscript(params.messages, params.existingIdentity) };
   }
 
   async generateNudge(params: NudgeParams) {

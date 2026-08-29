@@ -1,4 +1,5 @@
-﻿import { DailyGoalLog, Goal } from '../types';
+﻿import { DailyGoalLog, Goal, UserConfig } from '../types';
+import { computeEngagementTier, getXpMultiplier } from './zeroToHero';
 
 export interface GamificationSummary {
   totalPoints: number;
@@ -66,7 +67,8 @@ export function getStreakRewardLabel(streakDays: number): string {
 export function calculateNexusPoints(
   goals: Goal[],
   dailyLogs: DailyGoalLog[],
-  todayStr: string
+  todayStr: string,
+  userConfig?: Pick<UserConfig, 'behaviorProfile'>
 ): GamificationSummary {
   const goalMap = new Map(goals.map((goal) => [goal.id, goal]));
 
@@ -97,6 +99,10 @@ export function calculateNexusPoints(
     goalStreakMap.set(goal.id, streak);
   }
 
+  const tier = userConfig?.behaviorProfile?.engagementTier || computeEngagementTier(userConfig?.behaviorProfile);
+  const todayMultiplierFor = (streak: number) =>
+    tier === 'building' ? getStreakMultiplier(streak) : getXpMultiplier(tier, streak);
+
   dailyLogs.forEach((log) => {
     if (!log.completed) return;
     const goal = goalMap.get(log.goalId);
@@ -104,7 +110,7 @@ export function calculateNexusPoints(
     const weeklyBonus = goal?.frequency === 'weekly' ? 10 : 0;
     const verificationBonus = log.proofVerified ? 8 : 0;
     const streak = goalStreakMap.get(log.goalId) || 0;
-    const multiplier = log.date === todayStr ? getStreakMultiplier(streak) : 1.0;
+    const multiplier = log.date === todayStr ? todayMultiplierFor(streak) : 1.0;
     const earned = Math.round((base + weeklyBonus + verificationBonus) * multiplier);
     const bonus = Math.round((base + weeklyBonus + verificationBonus) * (multiplier - 1));
 
@@ -146,7 +152,7 @@ export function calculateNexusPoints(
     levelTitle: getLevelTitle(level),
     levelProgress: progress,
     pointsToNextLevel: toNext,
-    todayStreakMultiplier: getStreakMultiplier(todayMaxStreak),
+    todayStreakMultiplier: todayMultiplierFor(todayMaxStreak),
     dailySweepToday,
   };
 }

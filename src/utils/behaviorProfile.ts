@@ -4,8 +4,9 @@
  */
 
 import { BehaviorProfile, CategoryKey, DailyGoalLog, Goal, PlannedTask } from '../types';
-import { computeAdaptiveDailyCap } from './taskScheduler';
 import { fallbackBehaviorProfile } from './planFallbacks';
+import { computeEngagementTier } from './zeroToHero';
+import { completionRateForWindow, computeRuthlessDailyCap } from './dailyCap';
 
 const CATS: CategoryKey[] = ['health', 'smarts', 'spiritual', 'selfCare', 'happiness'];
 
@@ -24,9 +25,9 @@ function last30Days(): string[] {
 }
 
 export function computeBehaviorProfile(
-  logs: DailyGoalLog[],
-  goals: Goal[],
-  plannedTasks: PlannedTask[],
+  logs: DailyGoalLog[] = [],
+  goals: Goal[] = [],
+  plannedTasks: PlannedTask[] = [],
   onboardedAt?: string
 ): BehaviorProfile {
   try {
@@ -117,7 +118,25 @@ export function computeBehaviorProfile(
     });
     tg.forEach((s, k) => { completionRateByTaskType[k] = s.total > 0 ? s.done / s.total : 0.5; });
 
-    const currentDailyCap = computeAdaptiveDailyCap(daysSinceOnboarding, overallRate);
+    const rate7d = completionRateForWindow(logs, goals, 7);
+    const engagementTier = computeEngagementTier({
+      completionRateByCategory,
+      completionRateByTaskType,
+      successfulTimeSlots: [],
+      failingTimeSlots: [],
+      avgStreakBeforeDropoff: 0,
+      lapseRecoveryDays: 2,
+      responsiveNudgeTypes: [],
+      lastComputedAt: '',
+      daysSinceOnboarding,
+      currentDailyCap: 2,
+    });
+    const currentDailyCap = computeRuthlessDailyCap({
+      daysSinceOnboarding,
+      rate30d: overallRate,
+      rate7d,
+      engagementTier,
+    });
 
     return {
       completionRateByCategory,
@@ -130,6 +149,8 @@ export function computeBehaviorProfile(
       lastComputedAt: new Date().toISOString(),
       daysSinceOnboarding,
       currentDailyCap,
+      completionRate7d: Math.round(rate7d * 100) / 100,
+      engagementTier,
     };
   } catch (err) {
     console.error('computeBehaviorProfile error, using fallback:', err);

@@ -36,6 +36,11 @@ export interface Goal {
   timelineMap?: string[];
   dependencyIds?: string[];      // GoalDependency.id entries
   fromIntake?: boolean;          // true if created by the planning engine
+  autoAdded?: boolean;
+  baselineTimelineRange?: { minDays: number; maxDays: number };
+  estimatedDaysToMastery?: number;
+  likelihoodPercent?: number;
+  adaptiveTimelineUpdatedAt?: string;
 }
 
 export interface DailyGoalLog {
@@ -89,6 +94,8 @@ export interface AIPlannedGoal {
   timelinePhase3: string;
   linkedGoalName?: string; // habit stack — name of goal this feeds into
   estimatedDaysToMastery?: number;
+  chanceOfAchievement?: number;
+  willpowerStrain?: string;
 }
 
 export interface GoalCorrelation {
@@ -127,7 +134,28 @@ export interface MasterBlueprint {
     pillarsCovered?: Partial<CategoryScores>;
   };
   createdAt: string;
-  status?: 'building' | 'ready' | 'failed';
+  status?: 'building' | 'ready' | 'failed' | 'pending_review';
+}
+
+export interface PendingPlanReview {
+  blueprint: MasterBlueprint;
+  transcript: { sender: 'user' | 'ai'; text: string }[];
+  partialConfig: UserConfig;
+  deferred?: boolean;
+}
+
+export interface AdaptiveTimelineWarning {
+  id: string;
+  goalId: string;
+  goalName: string;
+  message: string;
+  previousDays: number;
+  currentDays: number;
+  previousLikelihood: number;
+  currentLikelihood: number;
+  direction: 'improved' | 'slipped';
+  createdAt: string;
+  read: boolean;
 }
 
 /** Persistent AI memory — facts learned about the user over time */
@@ -145,15 +173,44 @@ export interface AIMemory {
   lastUpdated?: string;
 }
 
-/** NEXUS AI persona — the AI's consistent fake "life" facts, never contradicted */
+/** Structured facts about the user — filled by LLM extraction, not keyword matching */
+export interface UserIdentity {
+  name?: string;
+  city?: string;
+  country?: string;
+  work?: string;
+  relationships?: string;
+  lifeGoals?: string[];
+  pillarNotes?: Partial<Record<CategoryKey, string>>;
+  setbacks?: string[];
+  dailyCapacity?: string;
+  preferredTime?: string;
+  extractedAt?: string;
+  source?: 'llm' | 'heuristic';
+}
+
+export interface WeeklyBlueprintRewrite {
+  at: string;
+  summary: string;
+  parkedGoalIds: string[];
+  activatedGoalIds: string[];
+  dailyCap: number;
+}
+
+/** NEXUS AI persona — a tiny locked file. Never invent a new backstory. */
 export interface NexusPersona {
-  lastMentionedShow?: string;    // e.g. "Arcane Season 2"
-  lastMentionedPlace?: string;   // e.g. "the gym (skipped leg day again 😭)"
-  lastMentionedFood?: string;    // e.g. "jollof rice"
-  lastMentionedSong?: string;    // e.g. "Kendrick - Not Like Us"
-  opinions?: string[];           // e.g. ["hates pineapple on pizza", "thinks Interstellar > Inception"]
-  funFacts?: string[];           // small canon facts NEXUS has stated about itself
-  angryAt?: string | null;       // set when NEXUS storms off; cleared next session open
+  locked?: boolean;
+  show?: string;
+  food?: string;
+  city?: string;
+  opinion?: string;
+  lastMentionedShow?: string;
+  lastMentionedPlace?: string;
+  lastMentionedFood?: string;
+  lastMentionedSong?: string;
+  opinions?: string[];
+  funFacts?: string[];
+  angryAt?: string | null;
   updatedAt?: string;
 }
 
@@ -175,7 +232,10 @@ export interface UserConfig {
   aiChatHistory?: AIChatMessage[];
   onboardingTranscript?: { sender: 'user' | 'ai'; text: string }[];
   aiMemory?: AIMemory;
-  nexusPersona?: NexusPersona;    // AI consistent fake-life memory
+  userIdentity?: UserIdentity;
+  nexusPersona?: NexusPersona;
+  lastBlueprintRewriteAt?: string;
+  lastBlueprintRewrite?: WeeklyBlueprintRewrite;
   aiServerUrl?: string;
   behaviorProfile?: BehaviorProfile;
   locationOptIn?: boolean;
@@ -191,6 +251,9 @@ export interface UserConfig {
   // Planning engine state (all optional — backward compatible)
   intakeState?: IntakeState;          // in-progress or last completed intake session
   onboardedAt?: string;               // ISO date string, used for adaptive cap calculation
+  adaptiveWarnings?: AdaptiveTimelineWarning[];
+  lastAdaptiveSyncAt?: string;
+  pendingPlanReview?: PendingPlanReview;
 }
 
 export interface LifeExpectancyFactor {
@@ -297,7 +360,9 @@ export interface BehaviorProfile {
   lastComputedAt: string;
   daysSinceOnboarding: number;
   /** Adaptive daily task cap based on consistency track record */
-  currentDailyCap: number;         // 2 → 7, computed by scheduler
+  currentDailyCap: number;
+  completionRate7d?: number;
+  engagementTier?: 'struggling' | 'building' | 'disciplined';
 }
 
 export interface FeasibilityResult {

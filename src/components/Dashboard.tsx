@@ -39,8 +39,12 @@ import {
   ChevronUp,
   ArrowRight,
   Target,
+  RefreshCw,
+  X,
 } from 'lucide-react';
 import { loadCustomFolders, saveCustomFolders } from '../utils/storage';
+import { selectDailyFocusGoals, capFromProfile } from '../utils/dailyCap';
+import { daysSince } from '../utils/weeklyBlueprint';
 import {
   CATEGORY_COLORS,
   CATEGORY_NAMES,
@@ -94,6 +98,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [folders, setFolders] = useState<string[]>(loadCustomFolders);
   const [newFolderNameInput, setNewFolderNameInput] = useState<string>('');
   const [showFolderModal, setShowFolderModal] = useState<boolean>(false);
+  const [rewriteBannerDismissed, setRewriteBannerDismissed] = useState<boolean>(false);
+
+  const showRewriteBanner =
+    !rewriteBannerDismissed &&
+    !!userConfig.lastBlueprintRewrite?.summary &&
+    daysSince(userConfig.lastBlueprintRewrite?.at) < 3;
 
   const { unlockedBadgeIds, hasNewUnlocks } = evaluateBadges(
     goals,
@@ -127,7 +137,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setShowFolderModal(false);
   };
 
-  const activeGoals = goals.filter((g) => !g.archived);
+  const dailyCap = userConfig.behaviorProfile?.currentDailyCap || capFromProfile(userConfig.behaviorProfile);
+  const focusGoals = selectDailyFocusGoals(goals, dailyLogs, dailyCap, todayStr);
+  const focusIds = new Set(focusGoals.map((g) => g.id));
+  const parkedCount = goals.filter((g) => {
+    if (g.archived || g.frequency === 'weekly') return false;
+    if (g.planStatus === 'paused' || g.planStatus === 'completed') return false;
+    return g.priority === 'parking_lot' || !focusIds.has(g.id);
+  }).length;
+  const usingDefaultFilters = filterFolder === 'all' && filterCategory === 'all' && filterStreak === 'all';
+  const activeGoals = usingDefaultFilters
+    ? focusGoals
+    : goals.filter((g) => !g.archived);
 
   // Compute best streaks & streak highlights across active goals
   const bestStreaksMap: Record<string, number> = {};
@@ -207,7 +228,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     pendingMissionGoals.find((g) => (g.priority || 'active') === 'maintenance') ||
     pendingMissionGoals[0];
   const missionPercent = activeGoals.length > 0 ? Math.round((completedTodayCount / activeGoals.length) * 100) : 0;
-  const nexusPoints = calculateNexusPoints(goals, dailyLogs, todayStr);
+  const nexusPoints = calculateNexusPoints(goals, dailyLogs, todayStr, userConfig);
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -527,8 +548,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <p className="text-xs text-zinc-400 font-light mt-0.5">
-              Organize habits into custom folders and complete routines to build streak multipliers
+              {usingDefaultFilters
+                ? `Today's focus: ${Math.min(focusGoals.length, dailyCap)} of ${dailyCap} slots${
+                    parkedCount ? ` · ${parkedCount} parked for a lighter week` : ''
+                  }`
+                : 'Organize habits into custom folders and complete routines to build streak multipliers'}
             </p>
+            {showRewriteBanner && usingDefaultFilters && (
+              <div className="mt-2 flex items-start gap-2 p-2.5 rounded-xl bg-amber-500/8 border border-amber-500/25 text-[11px] text-amber-300/90">
+                <RefreshCw className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                <span className="flex-1 leading-relaxed">
+                  <span className="font-semibold text-amber-200">Week rewrite</span>
+                  {userConfig.lastBlueprintRewrite?.dailyCap ? ` · cap ${userConfig.lastBlueprintRewrite.dailyCap}` : ''}: {userConfig.lastBlueprintRewrite?.summary}
+                </span>
+                <button
+                  onClick={() => setRewriteBannerDismissed(true)}
+                  className="text-amber-400/60 hover:text-amber-300 flex-shrink-0"
+                  aria-label="Dismiss rewrite banner"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* View Mode Toggle & Controls */}

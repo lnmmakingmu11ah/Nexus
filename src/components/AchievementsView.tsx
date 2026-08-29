@@ -41,8 +41,8 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
   const total = BADGE_DEFINITIONS.length;
   const todayStr = new Date().toISOString().split('T')[0];
   const nexusPoints = useMemo(
-    () => calculateNexusPoints(goals, dailyLogs, todayStr),
-    [goals, dailyLogs, todayStr]
+    () => calculateNexusPoints(goals, dailyLogs, todayStr, userConfig),
+    [goals, dailyLogs, todayStr, userConfig]
   );
 
   return (

@@ -143,6 +143,76 @@ async function startServer() {
   app.post('/api/ai/chat', handleChatCompanion);
   app.post('/api/gemini/chat', handleChatCompanion);
 
+  const handleChatStream = async (req: express.Request, res: express.Response) => {
+    try {
+      const adapter = getAIAdapter();
+      const body = req.body;
+      const lastUserMsg: string = (body.messages || [])
+        .filter((m: any) => m.sender === 'user')
+        .slice(-1)[0]?.text || '';
+      const searchTopic = detectChatSearchTopic(lastUserMsg);
+      let webContext: string | undefined;
+      if (searchTopic) {
+        webContext = (await quickChatSearch(searchTopic, process.env.SERPER_API_KEY)) || undefined;
+      }
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders?.();
+
+      const send = (payload: Record<string, unknown>) => {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      };
+
+      if (typeof adapter.streamChatCompanion === 'function') {
+        const result = await adapter.streamChatCompanion(
+          { ...body, webContext, nexusPersona: body.nexusPersona },
+          (chunk) => send({ type: 'delta', text: chunk })
+        );
+        send({
+          type: 'done',
+          readyForPlan: result.readyForPlan,
+          planApproved: result.planApproved,
+          reply: result.reply,
+          messages: result.messages,
+        });
+      } else {
+        const result = await adapter.chatCompanion({ ...body, webContext, nexusPersona: body.nexusPersona });
+        const text = (result as any).messages?.[0] || result.reply;
+        send({ type: 'delta', text });
+        send({
+          type: 'done',
+          readyForPlan: result.readyForPlan,
+          planApproved: result.planApproved,
+          reply: result.reply,
+          messages: (result as any).messages || [result.reply],
+        });
+      }
+      return res.end();
+    } catch (err: any) {
+      console.error('Chat stream error:', err);
+      if (!res.headersSent) {
+        return res.status(500).json({ error: err.message || 'AI service error' });
+      }
+      res.write(`data: ${JSON.stringify({ type: 'error', error: err.message || 'AI service error' })}\n\n`);
+      return res.end();
+    }
+  };
+  app.post('/api/ai/chat-stream', handleChatStream);
+
+  const handleExtractIdentity = async (req: express.Request, res: express.Response) => {
+    try {
+      const adapter = getAIAdapter();
+      const result = await adapter.extractIdentity(req.body);
+      return res.json(result);
+    } catch (err: any) {
+      console.error('Extract identity error:', err);
+      return res.status(500).json({ error: err.message || 'AI service error' });
+    }
+  };
+  app.post('/api/ai/extract-identity', handleExtractIdentity);
+
 
   // 6. Synthesize Blueprint & Timelines Endpoint
   const handleSynthesizeBlueprint = async (req: express.Request, res: express.Response) => {

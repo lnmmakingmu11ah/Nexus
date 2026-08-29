@@ -122,7 +122,9 @@ export function calculateScoresForDate(
   dailyLogs: DailyGoalLog[],
   userConfig: UserConfig
 ): ScoreCalculationResult {
-  const activeGoals = goals.filter((g) => !g.archived);
+  const activeGoals = goals.filter(
+    (g) => !g.archived && g.priority !== 'parking_lot' && g.planStatus !== 'paused' && g.planStatus !== 'completed'
+  );
   const activeCategoryGoals = activeGoals.filter((g) => !g.archived);
 
   // Initialize with baseline values

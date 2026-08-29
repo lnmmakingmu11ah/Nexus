@@ -211,8 +211,13 @@ export const GoalsManager: React.FC<GoalsManagerProps> = ({
                   tasks={plannedTasks}
                   milestones={milestones}
                   goals={goals}
+                  goalDependencies={goalDependencies}
                   behaviorProfile={userConfig?.behaviorProfile}
-                  userConfig={{ userName: userConfig?.userName, behaviorProfile: userConfig?.behaviorProfile }}
+                  userConfig={{
+                    userName: userConfig?.userName,
+                    behaviorProfile: userConfig?.behaviorProfile,
+                    lastBlueprintRewrite: userConfig?.lastBlueprintRewrite,
+                  }}
                   onTasksUpdated={onTasksUpdated || (() => {})}
                   onGoalCompleted={onToggleGoal}
                 />

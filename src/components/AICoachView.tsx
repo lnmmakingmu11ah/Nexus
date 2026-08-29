@@ -24,9 +24,12 @@ import { UserConfig, AIChatMessage, Goal, DailyGoalLog, DailyJournal, CATEGORY_N
 import { aiClient } from '../services/aiClient';
 import { calculateWillpowerAnalytics } from '../utils/willpowerAnalytics';
 import { apiOfflineMessage, smartOfflineReply } from '../utils/chatFallback';
+import { bubblesFromStreamBuffer, liveStreamVisible } from '../utils/chatTyping';
 import { AiErrorPanel } from './AiErrorPanel';
 import { mergeMemory } from '../utils/aiMemory';
 import { buildAdaptiveTimeline } from '../utils/timelinePlanner';
+import { ensureNexusPersona } from '../utils/nexusPersona';
+import { mergeIdentity } from '../utils/userIdentity';
 
 interface AICoachViewProps {
   userConfig: UserConfig;
@@ -35,6 +38,8 @@ interface AICoachViewProps {
   onToggleGoal?: (goalId: string) => void;
   onNavigateTab?: (tab: string) => void;
   onSaveJournal?: (journal: DailyJournal) => void;
+  onRerunGoalScout?: () => void;
+  onOpenPlanReview?: () => void;
   existingGoals: Goal[];
   dailyLogs: DailyGoalLog[];
   journals: DailyJournal[];
@@ -202,6 +207,8 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
   onToggleGoal,
   onNavigateTab,
   onSaveJournal,
+  onRerunGoalScout,
+  onOpenPlanReview,
   existingGoals,
   dailyLogs,
   journals,
@@ -296,46 +303,78 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
         statusLabel: goal.statusLabel,
       }));
 
-      const res = await aiClient.chatCompanion({
-        messages: apiMessages,
-        nexusPersona: userConfig.nexusPersona,
-        userContext: {
+      const liveId = `ai-live-${Date.now()}`;
+      const res = await aiClient.chatCompanionStream(
+        {
+          messages: apiMessages,
+          nexusPersona: ensureNexusPersona(userConfig.nexusPersona),
+          userContext: {
 
-          userName: userConfig.userName,
-          lifePathGoal: userConfig.lifePathGoal,
-          stage: 'open_chat',
-          location: userConfig.locationOptIn
-            ? {
-                label: userConfig.locationLabel,
-                countryCode: userConfig.countryCode,
-                latitude: userConfig.coordinates?.latitude,
-                longitude: userConfig.coordinates?.longitude,
-              }
-            : undefined,
-          aiMemory: userConfig.aiMemory,
-          appContext: {
-            today,
-            yesterday,
-            activeGoals: activeGoals.slice(0, 12).map((goal) => ({
-              id: goal.id,
-              name: goal.name,
-              description: goal.description,
-              category: goal.category,
-              reminderTime: goal.reminderTime,
-              timeline: goalTimelineLabel(goal),
-              timelineSummary: goal.timelineSummary,
-              timelineMap: goal.timelineMap,
-            })),
-            completedToday,
-            missedYesterday,
-            recentCompletions,
-            recentJournals,
-            currentScore,
-            behaviorProfile: userConfig.behaviorProfile,
-            goalProgress,
+            userName: userConfig.userName,
+            userIdentity: userConfig.userIdentity,
+            lifePathGoal: userConfig.lifePathGoal,
+            stage: 'open_chat',
+            location: userConfig.locationOptIn
+              ? {
+                  label: userConfig.locationLabel,
+                  countryCode: userConfig.countryCode,
+                  latitude: userConfig.coordinates?.latitude,
+                  longitude: userConfig.coordinates?.longitude,
+                }
+              : undefined,
+            aiMemory: userConfig.aiMemory,
+            appContext: {
+              today,
+              yesterday,
+              activeGoals: activeGoals.slice(0, 12).map((goal) => ({
+                id: goal.id,
+                name: goal.name,
+                description: goal.description,
+                category: goal.category,
+                reminderTime: goal.reminderTime,
+                timeline: goalTimelineLabel(goal),
+                timelineSummary: goal.timelineSummary,
+                timelineMap: goal.timelineMap,
+              })),
+              completedToday,
+              missedYesterday,
+              recentCompletions,
+              recentJournals,
+              currentScore,
+              behaviorProfile: userConfig.behaviorProfile,
+              goalProgress,
+            },
           },
         },
-      });
+        (_chunk, full) => {
+          const { closed, current } = bubblesFromStreamBuffer(full);
+          const liveText = liveStreamVisible(current);
+          setChatMessages((prev) => {
+            const withoutThisTurnAi = prev.filter(
+              (m) => m.id !== liveId && !m.id.startsWith(`${liveId}-c`)
+            );
+            const closedBubbles: AIChatMessage[] = closed
+              .map((b, i) => ({
+                id: `${liveId}-c${i}`,
+                sender: 'ai' as const,
+                text: liveStreamVisible(b),
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              }))
+              .filter((b) => b.text);
+            const next = [...withoutThisTurnAi, ...closedBubbles];
+            if (liveText) {
+              next.push({
+                id: liveId,
+                sender: 'ai',
+                text: liveText,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              });
+            }
+            return next;
+          });
+          // Typing indicator stays until the stream fully completes (cleared in finally)
+        }
+      );
 
       setBrainOffline(false);
       setLastAiError(null);
@@ -344,15 +383,10 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
         ? res.messages
         : [res.reply];
 
-      // Drip bubbles one by one with realistic typing delays between them
-      let runningMessages = [...newMessages];
-      for (let i = 0; i < bubbles.length; i++) {
-        if (i > 0) {
-          // Show typing indicator briefly between bubbles
-          await new Promise<void>((resolve) => setTimeout(resolve, 700 + Math.random() * 700));
-        }
+      const finalized: AIChatMessage[] = [];
+      bubbles.forEach((rawBubble, i) => {
         const { cleanedText, actionTag } = parseAndExecuteAction(
-          bubbles[i],
+          rawBubble,
           existingGoals,
           onAddGoals,
           onToggleGoal,
@@ -360,22 +394,27 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
           onSaveJournal
         );
         const bubbleText = actionTag ? `${cleanedText}\n\n[ ${actionTag} ]` : cleanedText;
-
-        const bubble: AIChatMessage = {
-          id: `ai-${Date.now()}-${i}`,
+        if (!bubbleText.trim()) return;
+        finalized.push({
+          id: `${liveId}-f${i}`,
           sender: 'ai',
           text: bubbleText,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        runningMessages = [...runningMessages, bubble];
-        setChatMessages([...runningMessages]);
-      }
+        });
+      });
 
-      // Save entire history + persona after all bubbles are shown
-      const configWithHistory = { ...userConfig, aiChatHistory: runningMessages };
+      const runningMessages = finalized.length ? [...newMessages, ...finalized] : newMessages;
+      if (finalized.length) setChatMessages(runningMessages);
+
+      // Save entire history + locked persona after stream settles
+      const configWithHistory = {
+        ...userConfig,
+        aiChatHistory: runningMessages,
+        nexusPersona: ensureNexusPersona(userConfig.nexusPersona),
+      };
       onUpdateUserConfig(configWithHistory);
 
-            // Extract & merge memory in background (non-blocking)
+      Promise.all([
         aiClient
           .extractMemory({
             messages: apiMessages.slice(-10),
@@ -402,13 +441,25 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
               goalProgress,
             },
           })
-          .then((memRes) => {
-            if (memRes?.memory && Object.keys(memRes.memory).length > 0) {
-              const merged = mergeMemory(userConfig.aiMemory, memRes.memory);
-              onUpdateUserConfig({ ...configWithHistory, aiMemory: merged });
-            }
+          .catch(() => ({ memory: undefined })),
+        aiClient
+          .extractIdentity({
+            messages: apiMessages.slice(-16),
+            existingIdentity: userConfig.userIdentity,
           })
-          .catch(() => { /* memory extraction is best-effort */ });
+          .catch(() => ({ identity: undefined })),
+      ]).then(([memRes, idRes]) => {
+        const next = { ...configWithHistory };
+        if (memRes?.memory && Object.keys(memRes.memory).length > 0) {
+          next.aiMemory = mergeMemory(userConfig.aiMemory, memRes.memory);
+        }
+        if (idRes?.identity) {
+          next.userIdentity = mergeIdentity(userConfig.userIdentity, idRes.identity);
+        }
+        if (next.aiMemory !== configWithHistory.aiMemory || next.userIdentity !== configWithHistory.userIdentity) {
+          onUpdateUserConfig(next);
+        }
+      });
 
     } catch (err: any) {
       console.error('NEXUS chat error:', err);
@@ -489,13 +540,33 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
               </span>
             </div>
             <p className="text-xs sm:text-sm text-zinc-400 font-light mt-1 max-w-2xl">
-              Daily chat + your saved blueprint. Goal scouting happens once at setup.
+              Daily chat + your saved lifetime blueprint. Goal Scout maps who you are, your life goals, and setbacks.
             </p>
           </div>
         </div>
 
         {/* Tab Switcher & Actions */}
         <div className="flex items-center space-x-2 self-start md:self-auto">
+          {onOpenPlanReview && (
+            <button
+              type="button"
+              onClick={onOpenPlanReview}
+              className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-amber-500/40 text-amber-200 hover:text-white hover:border-amber-400 flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3 h-3" />
+              Review plan
+            </button>
+          )}
+          {onRerunGoalScout && (
+            <button
+              type="button"
+              onClick={onRerunGoalScout}
+              className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-zinc-700 text-zinc-300 hover:text-white hover:border-amber-500/40 flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Re-run Goal Scout
+            </button>
+          )}
           <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
             <button
               onClick={() => setActiveTab('blueprint')}
@@ -526,6 +597,17 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
       {/* TAB 1: MASTER BLUEPRINT & TIMELINES */}
       {activeTab === 'blueprint' && (
         <div className="space-y-6">
+          {userConfig.adaptiveWarnings && userConfig.adaptiveWarnings.length > 0 && (
+            <div className="bg-zinc-950 border border-amber-500/25 rounded-2xl p-4 space-y-2">
+              <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Timeline shifts</h3>
+              {userConfig.adaptiveWarnings.slice(-4).reverse().map((w) => (
+                <p key={w.id} className={`text-[11px] leading-relaxed ${w.direction === 'slipped' ? 'text-rose-300' : 'text-emerald-300'}`}>
+                  {w.message}
+                </p>
+              ))}
+            </div>
+          )}
+
           {/* Master Vision & Overview */}
           {blueprint && (
             <div className="bg-gradient-to-br from-zinc-950/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-3">
@@ -541,6 +623,24 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
                   <span className="text-zinc-500 font-mono text-[10px] uppercase">About you: </span>
                   {blueprint.userProfileSummary}
                 </p>
+              )}
+              {userConfig.behaviorProfile?.engagementTier && (
+                <p className="text-[11px] text-amber-200/80">
+                  Coaching mode:{' '}
+                  {userConfig.behaviorProfile.engagementTier === 'struggling'
+                    ? 'rebuild — tiny tasks, more badges'
+                    : userConfig.behaviorProfile.engagementTier === 'disciplined'
+                      ? 'disciplined — meaningful work, fewer micro-rewards'
+                      : 'building — ramping difficulty with your consistency'}
+                </p>
+              )}
+              {(blueprint.extractedSetbacks?.length || 0) > 0 && (
+                <div className="border-t border-zinc-800/80 pt-3">
+                  <span className="text-zinc-500 font-mono text-[10px] uppercase">Setbacks NEXUS mapped</span>
+                  <p className="text-xs text-rose-200/90 mt-1 leading-relaxed">
+                    {blueprint.extractedSetbacks!.join(' · ')}
+                  </p>
+                </div>
               )}
             </div>
           )}
@@ -562,7 +662,8 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
             {blueprint?.plannedGoals && blueprint.plannedGoals.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {blueprint.plannedGoals.slice(0, 4).map((pg: any, idx: number) => {
-                  const chance = pg.chanceOfAchievement || 80;
+                  const live = existingGoals.find((g) => g.name.toLowerCase() === String(pg.name || '').toLowerCase());
+                  const chance = live?.likelihoodPercent || pg.chanceOfAchievement || 80;
                   return (
                     <div key={idx} className="bg-zinc-900/80 border border-zinc-800 p-3.5 rounded-xl space-y-2">
                       <div className="flex justify-between items-start">
@@ -630,7 +731,8 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
                 {blueprint.plannedGoals.map((planned: any, idx: number) => {
                   const catColor = CATEGORY_COLORS[planned.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.smarts;
                   const isAlreadyAdded = addedGoalNames.has(planned.name.toLowerCase());
-                  const chance = planned.chanceOfAchievement || 80;
+                  const live = existingGoals.find((g) => g.name.toLowerCase() === String(planned.name || '').toLowerCase());
+                  const chance = live?.likelihoodPercent || planned.chanceOfAchievement || 80;
                   return (
                     <div
                       key={idx}

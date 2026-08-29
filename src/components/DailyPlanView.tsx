@@ -3,18 +3,20 @@ import {
   CheckCircle2, SkipForward, Calendar, Clock, Flame,
   ChevronRight, AlertCircle, Loader2, TrendingUp, RotateCcw
 } from 'lucide-react';
-import { PlannedTask, Milestone, Goal, BehaviorProfile, TaskHardness } from '../types';
+import { PlannedTask, Milestone, Goal, BehaviorProfile, TaskHardness, GoalDependency } from '../types';
 import { aiClient } from '../services/aiClient';
 import { savePlannedTasks } from '../utils/storage';
-import { detectLapse } from '../utils/taskScheduler';
+import { detectLapse, getTasksForDate } from '../utils/taskScheduler';
 import { fallbackLapseRecovery } from '../utils/planFallbacks';
+import { applyLapseRecoveryToTasks, computeEngagementTier } from '../utils/zeroToHero';
 
 interface DailyPlanViewProps {
   tasks: PlannedTask[];
   milestones: Milestone[];
   goals: Goal[];
+  goalDependencies?: GoalDependency[];
   behaviorProfile?: BehaviorProfile;
-  userConfig: { userName?: string; behaviorProfile?: BehaviorProfile };
+  userConfig: { userName?: string; behaviorProfile?: BehaviorProfile; lastBlueprintRewrite?: { summary?: string; dailyCap?: number } };
   onTasksUpdated: (tasks: PlannedTask[]) => void;
   onGoalCompleted?: (goalId: string) => void;
 }
@@ -29,10 +31,25 @@ const HARDNESS_CONFIG: Record<TaskHardness, { label: string; color: string; dot:
 };
 
 export const DailyPlanView: React.FC<DailyPlanViewProps> = ({
-  tasks, milestones, goals, behaviorProfile, userConfig, onTasksUpdated, onGoalCompleted,
+  tasks, milestones, goals, goalDependencies = [], behaviorProfile, userConfig, onTasksUpdated, onGoalCompleted,
 }) => {
   const today = new Date().toISOString().split('T')[0];
-  const todayTasks = tasks.filter(t => t.scheduledDate === today);
+  const cap = behaviorProfile?.currentDailyCap || 2;
+  const scheduledToday = getTasksForDate(
+    today,
+    goals,
+    milestones,
+    tasks,
+    goalDependencies,
+    { maxNewTasksPerDay: cap },
+    behaviorProfile
+  );
+  const scheduledIds = new Set(scheduledToday.map((t) => t.id));
+  const todayTasks = tasks.filter(
+    (t) =>
+      t.scheduledDate === today &&
+      (t.status === 'done' || t.status === 'skipped' || scheduledIds.has(t.id))
+  );
   const doneTasks = todayTasks.filter(t => t.status === 'done');
   const pendingTasks = todayTasks.filter(t => t.status === 'pending');
   const skippedTasks = todayTasks.filter(t => t.status === 'skipped');
@@ -91,6 +108,17 @@ export const DailyPlanView: React.FC<DailyPlanViewProps> = ({
     try {
       const result = await aiClient.lapseRecovery({ missedCount: missedDays, goalName: mostMissedGoal, behaviorProfile });
       setLapseMsg(result.message);
+      const tier = behaviorProfile?.engagementTier || computeEngagementTier(behaviorProfile);
+      const shrunk = applyLapseRecoveryToTasks(
+        tasks,
+        goals.filter((g) => !g.archived).map((g) => g.id),
+        tier,
+        result.adjustedPlan
+      );
+      if (shrunk.some((t, i) => t.durationMinutes !== tasks[i]?.durationMinutes || t.hardness !== tasks[i]?.hardness)) {
+        onTasksUpdated(shrunk);
+        savePlannedTasks(shrunk);
+      }
     } catch {
       setLapseMsg(fallbackLapseRecovery(missedDays, mostMissedGoal));
     } finally {
@@ -194,8 +222,8 @@ export const DailyPlanView: React.FC<DailyPlanViewProps> = ({
                     <p className="text-sm font-medium text-white leading-snug">
                       {framed?.framedTitle || task.title}
                     </p>
-                    {framed?.motivationalNote && (
-                      <p className="text-xs text-white/40 mt-0.5 leading-relaxed">{framed.motivationalNote}</p>
+                    {(framed?.motivationalNote || task.motivationalNote) && (
+                      <p className="text-xs text-white/40 mt-0.5 leading-relaxed">{framed?.motivationalNote || task.motivationalNote}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1.5">
                       {goal && <span className="text-xs text-white/30">{goal.name}</span>}
@@ -248,7 +276,13 @@ export const DailyPlanView: React.FC<DailyPlanViewProps> = ({
       {/* Cap info */}
       {behaviorProfile && (
         <p className="text-xs text-white/25 px-1">
-          Daily cap: {behaviorProfile.currentDailyCap} tasks (grows as u stay consistent)
+          Daily cap: {behaviorProfile.currentDailyCap} tasks
+          {behaviorProfile.engagementTier === 'struggling'
+            ? ' · rough week: two habits max'
+            : behaviorProfile.engagementTier === 'disciplined'
+              ? ' · disciplined mode: fewer micro-wins, heavier work'
+              : ' · grows as you stay consistent'}
+          {userConfig.lastBlueprintRewrite?.summary ? ` · ${userConfig.lastBlueprintRewrite.summary}` : ''}
         </p>
       )}
     </div>

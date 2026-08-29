@@ -19,6 +19,7 @@ import { SmartReminderNotifier } from './components/SmartReminderNotifier';
 import { NexusNotificationCenter } from './components/NexusNotificationCenter';
 import { LocationSettings } from './components/LocationSettings';
 import { AiServerSettings } from './components/AiServerSettings';
+import { PlanReviewModal } from './components/PlanReviewModal';
 import { HabitStackPrompt } from './components/HabitStackPrompt';
 import { triggerHapticFeedback } from './utils/haptics';
 import { aiClient } from './services/aiClient';
@@ -26,6 +27,7 @@ import { mergeMemory } from './utils/aiMemory';
 
 import {
   AIDigest,
+  AIPlannedGoal,
   DailyGoalLog,
   DailyJournal,
   Goal,
@@ -65,14 +67,25 @@ import { fallbackGoalDraft, fallbackMilestones, fallbackTask } from './utils/pla
 import { detectOverlaps, buildDependencyGraph } from './utils/dependencyGraph';
 import { buildAdaptiveTimeline, buildTimelineMilestones } from './utils/timelinePlanner';
 import { computeBehaviorProfile } from './utils/behaviorProfile';
-import { matchGoalByName } from './utils/blueprintNormalizer';
+import { applyAdaptiveTimelinesToGoals, mergeAdaptiveWarnings, syncBlueprintFromGoals, adaptPendingTasks } from './utils/adaptiveEngine';
+import { filterIntakePlanArtifacts, materializeBlueprintPlan } from './utils/planMaterializer';
+import { checkAndUnlockBadges } from './utils/badges';
+import { ensureNexusPersona } from './utils/nexusPersona';
+import { rewriteBlueprintFromCompletions, shouldRewriteBlueprint } from './utils/weeklyBlueprint';
+import { mergeIdentity } from './utils/userIdentity';
+import { applyDailyCapToGoals, capFromProfile } from './utils/dailyCap';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [todayStr] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // Persistent States
-  const [userConfig, setUserConfig] = useState<UserConfig>(loadUserConfig);
+  const [userConfig, setUserConfig] = useState<UserConfig>(() => {
+    const loaded = loadUserConfig();
+    const next = { ...loaded, nexusPersona: ensureNexusPersona(loaded.nexusPersona) };
+    if (!loaded.nexusPersona?.locked) saveUserConfig(next);
+    return next;
+  });
   const [goals, setGoals] = useState<Goal[]>(loadGoals);
   const [dailyLogs, setDailyLogs] = useState<DailyGoalLog[]>(loadDailyLogs);
   const [journals, setJournals] = useState<DailyJournal[]>(loadJournals);
@@ -102,12 +115,63 @@ export default function App() {
     );
     const current = JSON.stringify({ ...(userConfig.behaviorProfile || {}), lastComputedAt: undefined });
     const next = JSON.stringify({ ...nextProfile, lastComputedAt: undefined });
-    if (current !== next) {
-      const updated = { ...userConfig, behaviorProfile: nextProfile };
-      setUserConfig(updated);
-      saveUserConfig(updated);
+    const profileChanged = current !== next;
+
+    const { goals: adaptedGoals, warnings } = applyAdaptiveTimelinesToGoals(goals, dailyLogs, nextProfile);
+    const timelinesChanged = adaptedGoals.some((g, i) =>
+      g.estimatedDaysToMastery !== goals[i]?.estimatedDaysToMastery ||
+      g.likelihoodPercent !== goals[i]?.likelihoodPercent ||
+      g.adaptiveTimelineUpdatedAt !== goals[i]?.adaptiveTimelineUpdatedAt
+    );
+
+    const adaptedTasks = adaptPendingTasks(plannedTasks, nextProfile, todayStr);
+    const tasksChanged = adaptedTasks.some(
+      (t, i) => t.hardness !== plannedTasks[i]?.hardness || t.durationMinutes !== plannedTasks[i]?.durationMinutes
+    );
+
+    if (!profileChanged && !timelinesChanged && !tasksChanged) return;
+
+    if (timelinesChanged) {
+      setGoals(adaptedGoals);
+      saveGoals(adaptedGoals);
     }
-  }, [dailyLogs, goals, plannedTasks, userConfig.onboarded, userConfig.onboardedAt, userConfig.behaviorProfile]);
+    if (tasksChanged) {
+      setPlannedTasks(adaptedTasks);
+      savePlannedTasks(adaptedTasks);
+    }
+
+    const updated: UserConfig = {
+      ...userConfig,
+      behaviorProfile: nextProfile,
+      ...(timelinesChanged
+        ? {
+            lastAdaptiveSyncAt: new Date().toISOString(),
+            adaptiveWarnings: mergeAdaptiveWarnings(userConfig.adaptiveWarnings, warnings),
+            masterBlueprint: syncBlueprintFromGoals(userConfig.masterBlueprint, adaptedGoals),
+          }
+        : {}),
+    };
+    setUserConfig(updated);
+    saveUserConfig(updated);
+  }, [dailyLogs, goals, plannedTasks, userConfig.onboarded, userConfig.onboardedAt, todayStr]);
+
+  useEffect(() => {
+    if (!shouldRewriteBlueprint(userConfig, dailyLogs)) return;
+    const { goals: nextGoals, rewrite, blueprint, dailyCap } = rewriteBlueprintFromCompletions(goals, dailyLogs, userConfig);
+    setGoals(nextGoals);
+    saveGoals(nextGoals);
+    const updated: UserConfig = {
+      ...userConfig,
+      lastBlueprintRewriteAt: rewrite.at,
+      lastBlueprintRewrite: rewrite,
+      masterBlueprint: blueprint || userConfig.masterBlueprint,
+      behaviorProfile: userConfig.behaviorProfile
+        ? { ...userConfig.behaviorProfile, currentDailyCap: dailyCap }
+        : userConfig.behaviorProfile,
+    };
+    setUserConfig(updated);
+    saveUserConfig(updated);
+  }, [dailyLogs, goals, userConfig.onboarded, userConfig.lastBlueprintRewriteAt, userConfig.masterBlueprint]);
 
   /** Called by GoalIntakeChat when AI finishes synthesizing a plan */
   const handlePlanReady = useCallback((
@@ -262,7 +326,12 @@ export default function App() {
     };
 
     // Commit to state and storage
-    const mergedGoals = [...goals, ...newGoals];
+    const mergedGoals = applyDailyCapToGoals(
+      [...goals, ...newGoals],
+      capFromProfile(userConfig.behaviorProfile),
+      dailyLogs,
+      todayStr
+    );
     setGoals(mergedGoals);
     saveGoals(mergedGoals);
 
@@ -363,183 +432,33 @@ export default function App() {
         setTimeout(() => setPlanBuildingStage('⚡ Finding habit correlations & multiplier stack-ups…'), 2000);
         setTimeout(() => setPlanBuildingStage('📊 Calibrating realistic timelines & success probabilities…'), 4500);
 
-        const res = await aiClient.synthesizeBlueprint({ transcript });
+        const identityRes = await aiClient.extractIdentity({
+          messages: transcript,
+          existingIdentity: partialConfig.userIdentity,
+        }).catch(() => ({ identity: partialConfig.userIdentity }));
+        const identity = mergeIdentity(partialConfig.userIdentity, identityRes?.identity);
+        const withIdentity: UserConfig = { ...partialConfig, userIdentity: identity, nexusPersona: ensureNexusPersona(partialConfig.nexusPersona) };
+        setUserConfig(withIdentity);
+        saveUserConfig(withIdentity);
+
+        const res = await aiClient.synthesizeBlueprint({
+          transcript,
+          userContext: { userName: withIdentity.userName, userIdentity: identity, behaviorProfile: withIdentity.behaviorProfile },
+        });
         const blueprint = res.blueprint;
-        setPlanBuildingStage('🎯 Synthesizing milestones & personalized daily actions…');
-
-        const newGoals: Goal[] = (blueprint?.plannedGoals || []).map(
-          (pg: any, idx: number) => {
-            const id = `goal-ai-${Date.now()}-${idx}`;
-            const cat = pg.category || 'smarts';
-            const adaptive = buildAdaptiveTimeline(
-              String(pg.name || `Goal ${idx + 1}`),
-              String(pg.description || ''),
-              partialConfig.behaviorProfile,
-              '',
-              pg.timelineRange
-            );
-            return {
-              id,
-              name: pg.name || `Goal ${idx + 1}`,
-              description: pg.autoAddedReason
-                ? `${pg.description || ''}\n\n(NEXUS note: ${pg.autoAddedReason})`.trim()
-                : pg.description || '',
-              category: cat,
-              frequency: pg.targetFrequency || 'daily',
-              reminderTime: pg.reminderTime || '08:30',
-              reminderEnabled: true,
-              basePoints: pg.basePoints || 5,
-              effects: pg.effects || [{ category: cat, weight: 4 }],
-              isLifePathAligned: true,
-              isCognitiveTraining: cat === 'smarts',
-              createdAt: new Date().toISOString(),
-              planStatus: 'active',
-              fromIntake: true,
-              timelineRange: pg.timelineRange || adaptive.timelineRange,
-              timelineSummary: pg.timelineSummary || adaptive.timelineSummary,
-              timelineMap: Array.isArray(pg.timelineMap) && pg.timelineMap.length ? pg.timelineMap : adaptive.timelineMap,
-            };
-          }
-        );
-
-        // Apply habit stacking from blueprint (linkedGoalName + goalStackUps)
-        for (const pg of blueprint?.plannedGoals || []) {
-          const goal = matchGoalByName(pg.name, newGoals);
-          if (!goal) continue;
-          const stackTarget = pg.linkedGoalName
-            ? matchGoalByName(pg.linkedGoalName, newGoals)
-            : undefined;
-          if (stackTarget && stackTarget.id !== goal.id) {
-            goal.linkedGoalId = stackTarget.id;
-            goal.stackingNote = `Stacks after: ${stackTarget.name}`;
-          }
-        }
-        for (const stack of blueprint?.goalStackUps || []) {
-          const primary = matchGoalByName(stack.primaryGoal, newGoals);
-          if (!primary) continue;
-          for (const supportingName of stack.supportingGoals || []) {
-            const supporting = matchGoalByName(supportingName, newGoals);
-            if (supporting && supporting.id !== primary.id) {
-              supporting.linkedGoalId = primary.id;
-              supporting.stackingNote = stack.rationale || `Supports ${primary.name}`;
-            }
-          }
-        }
-
-        // Build milestones for each goal
-        const newMilestones: Milestone[] = [];
-        newGoals.forEach((goal, gi) => {
-          const pg = blueprint?.plannedGoals?.[gi];
-          const map = Array.isArray(goal.timelineMap) && goal.timelineMap.length ? goal.timelineMap : [];
-          const helperMilestones = buildTimelineMilestones(goal.id, goal.timelineRange || pg?.timelineRange, goal.name);
-          if (map.length >= 4) {
-            map.slice(0, helperMilestones.length).forEach((segment, idx) => {
-              if (helperMilestones[idx]) {
-                helperMilestones[idx] = {
-                  ...helperMilestones[idx],
-                  title: segment,
-                };
-              }
-            });
-          }
-          newMilestones.push(...helperMilestones);
-        });
-
-        // Build daily scheduled tasks for the next 30 days
-        const newTasks: PlannedTask[] = [];
-        newGoals.forEach((goal, gi) => {
-          const ms = newMilestones.find(m => m.goalId === goal.id);
-          if (!ms) return;
-          for (let d = 0; d < 30; d++) {
-            const date = new Date();
-            date.setDate(date.getDate() + d);
-            const ds = date.toISOString().split('T')[0];
-            newTasks.push({
-              id: `task-${goal.id}-${d}-${Date.now()}`,
-              milestoneId: ms.id,
-              goalId: goal.id,
-              title: goal.name,
-              description: goal.description,
-              scheduledDate: ds,
-              durationMinutes: 20,
-              hardness: 2,
-              isRecurring: true,
-              recurrencePattern: 'daily',
-              status: 'pending',
-            });
-          }
-        });
-
-        // Build dependencies from correlations (exact name matching)
-        const newDeps: GoalDependency[] = (blueprint?.goalCorrelations || []).flatMap((gc: any, idx: number) => {
-          const names = Array.isArray(gc.goals) ? gc.goals : [];
-          if (names.length < 2) return [];
-          const g1 = matchGoalByName(names[0], newGoals);
-          const g2 = matchGoalByName(names[1], newGoals);
-          if (!g1 || !g2 || g1.id === g2.id) return [];
-          return [{
-            id: `dep-${Date.now()}-${idx}`,
-            fromGoalId: g1.id,
-            toGoalId: g2.id,
-            type: 'shared_infrastructure' as const,
-            rationale: gc.insight || 'Reinforces daily habit momentum',
-          }];
-        });
-
-        const baselines = blueprint?.categoryBaselines || {
-          health: 50, spiritual: 50, smarts: 50, selfCare: 50, happiness: 50,
+        const reviewConfig: UserConfig = {
+          ...withIdentity,
+          onboardedAt: partialConfig.onboardedAt || new Date().toISOString(),
+          pendingPlanReview: {
+            blueprint: { ...blueprint, createdAt: new Date().toISOString(), status: 'pending_review' },
+            transcript,
+            partialConfig: withIdentity,
+          },
         };
-
-        const blueprintMemory = mergeMemory(partialConfig.aiMemory, {
-          userProfile: blueprint?.userProfileSummary || partialConfig.aiMemory?.userProfile,
-          knownGoals: newGoals.map((g) => g.name),
-          setbacks: blueprint?.extractedSetbacks || [],
-          motivations: blueprint?.masterVision ? [blueprint.masterVision] : [],
-          personalNotes: blueprint?.pillarAutoFillNotes ? [blueprint.pillarAutoFillNotes] : [],
-          lastUpdated: new Date().toISOString(),
-        });
-
-        const finalConfig: UserConfig = {
-          ...partialConfig,
-          userName: blueprint?.userName || partialConfig.userName,
-          lifePathGoal: blueprint?.masterVision || partialConfig.lifePathGoal,
-          categoryBaselines: baselines,
-          aiMemory: blueprintMemory,
-          onboardingTranscript: transcript,
-          masterBlueprint: blueprint
-            ? { ...blueprint, createdAt: new Date().toISOString(), status: 'ready' }
-            : undefined,
-        };
-
-        setUserConfig(finalConfig);
-        saveUserConfig(finalConfig);
-
-        if (newGoals.length > 0) {
-          const mergedGoals = [...newGoals, ...goals.filter(g => !newGoals.some(ng => ng.name.toLowerCase() === g.name.toLowerCase()))];
-          setGoals(mergedGoals);
-          saveGoals(mergedGoals);
-        }
-
-        if (newMilestones.length > 0) {
-          const mergedMilestones = [...milestones, ...newMilestones];
-          setMilestones(mergedMilestones);
-          saveMilestones(mergedMilestones);
-        }
-
-        if (newTasks.length > 0) {
-          const mergedTasks = [...plannedTasks, ...newTasks];
-          setPlannedTasks(mergedTasks);
-          savePlannedTasks(mergedTasks);
-        }
-
-        if (newDeps.length > 0) {
-          const mergedDeps = [...goalDependencies, ...newDeps];
-          setGoalDependencies(mergedDeps);
-          saveGoalDependencies(mergedDeps);
-        }
-
+        setUserConfig(reviewConfig);
+        saveUserConfig(reviewConfig);
         setPlanBuildDone(true);
-        triggerStreakToast('NEXUS Blueprint', 0, '🎯 Your personal growth plan is ready! Check AI Coach and Goals');
+        triggerStreakToast('NEXUS Blueprint', 0, '🎯 Plan ready — review and lock your goals');
         setTimeout(() => setPlanBuildDone(false), 10000);
       } catch (err) {
         console.error('Background blueprint synthesis failed:', err);
@@ -548,9 +467,90 @@ export default function App() {
         setIsPlanBuilding(false);
       }
     },
-    [goals, milestones, plannedTasks, goalDependencies]
+    []
   );
 
+  const handleConfirmPlanReview = useCallback(
+    (selected: AIPlannedGoal[]) => {
+      const pending = userConfig.pendingPlanReview;
+      if (!pending?.blueprint) return;
+      const blueprint = { ...pending.blueprint, plannedGoals: selected, status: 'ready' as const };
+      const materialized = materializeBlueprintPlan(blueprint, pending.partialConfig, selected);
+
+      const blueprintMemory = mergeMemory(pending.partialConfig.aiMemory, {
+        userProfile: blueprint.userProfileSummary || pending.partialConfig.aiMemory?.userProfile,
+        knownGoals: materialized.goals.map((g) => g.name),
+        setbacks: blueprint.extractedSetbacks || [],
+        motivations: blueprint.masterVision ? [blueprint.masterVision] : [],
+        personalNotes: blueprint.pillarAutoFillNotes ? [blueprint.pillarAutoFillNotes] : [],
+        lastUpdated: new Date().toISOString(),
+      });
+
+      const baselines = blueprint.categoryBaselines || pending.partialConfig.categoryBaselines;
+      const finalConfig: UserConfig = {
+        ...pending.partialConfig,
+        userName: blueprint.userName || pending.partialConfig.userName,
+        lifePathGoal: blueprint.masterVision || pending.partialConfig.lifePathGoal,
+        categoryBaselines: baselines,
+        aiMemory: blueprintMemory,
+        userIdentity: pending.partialConfig.userIdentity || userConfig.userIdentity,
+        nexusPersona: ensureNexusPersona(pending.partialConfig.nexusPersona || userConfig.nexusPersona),
+        onboardingTranscript: pending.transcript,
+        masterBlueprint: { ...blueprint, createdAt: new Date().toISOString(), status: 'ready' },
+        pendingPlanReview: undefined,
+        onboardedAt: pending.partialConfig.onboardedAt || new Date().toISOString(),
+      };
+
+      setUserConfig(finalConfig);
+      saveUserConfig(finalConfig);
+
+      const cleaned = filterIntakePlanArtifacts(goals, milestones, plannedTasks, goalDependencies);
+      const mergedGoals = [
+        ...materialized.goals,
+        ...cleaned.goals.filter((g) => !materialized.goals.some((ng) => ng.name.toLowerCase() === g.name.toLowerCase())),
+      ];
+      const cappedMerged = applyDailyCapToGoals(mergedGoals, capFromProfile(finalConfig.behaviorProfile), dailyLogs, todayStr);
+      setGoals(cappedMerged);
+      saveGoals(cappedMerged);
+      setMilestones([...cleaned.milestones, ...materialized.milestones]);
+      saveMilestones([...cleaned.milestones, ...materialized.milestones]);
+      setPlannedTasks([...cleaned.tasks, ...materialized.tasks]);
+      savePlannedTasks([...cleaned.tasks, ...materialized.tasks]);
+      setGoalDependencies([...cleaned.dependencies, ...materialized.dependencies]);
+      saveGoalDependencies([...cleaned.dependencies, ...materialized.dependencies]);
+      setCurrentTab('aicoach');
+    },
+    [userConfig.pendingPlanReview, goals, milestones, plannedTasks, goalDependencies]
+  );
+
+  const handleRerunGoalScout = useCallback(() => {
+    const confirmed = window.confirm(
+      'Re-run Goal Scout? Intake-generated goals and the current blueprint will be cleared so NEXUS can rebuild your lifetime plan.'
+    );
+    if (!confirmed) return;
+    const cleaned = filterIntakePlanArtifacts(goals, milestones, plannedTasks, goalDependencies);
+    setGoals(cleaned.goals);
+    saveGoals(cleaned.goals);
+    setMilestones(cleaned.milestones);
+    saveMilestones(cleaned.milestones);
+    setPlannedTasks(cleaned.tasks);
+    savePlannedTasks(cleaned.tasks);
+    setGoalDependencies(cleaned.dependencies);
+    saveGoalDependencies(cleaned.dependencies);
+
+    const resetConfig: UserConfig = {
+      ...userConfig,
+      onboarded: false,
+      masterBlueprint: undefined,
+      pendingPlanReview: undefined,
+      onboardingTranscript: undefined,
+      adaptiveWarnings: [],
+      aiChatHistory: [],
+    };
+    setUserConfig(resetConfig);
+    saveUserConfig(resetConfig);
+    setShowOnboarding(true);
+  }, [goals, milestones, plannedTasks, goalDependencies, userConfig]);
 
   const handleBatchAddGoals = (newGoalsData: Partial<Goal>[]) => {
     setGoals((currentGoals) => {
@@ -575,7 +575,12 @@ export default function App() {
         }));
 
       if (createdGoals.length > 0) {
-        const updated = [...createdGoals, ...currentGoals];
+        const updated = applyDailyCapToGoals(
+          [...createdGoals, ...currentGoals],
+          capFromProfile(userConfig.behaviorProfile),
+          dailyLogs,
+          todayStr
+        );
         saveGoals(updated);
         return updated;
       }
@@ -657,6 +662,24 @@ export default function App() {
         triggerHapticFeedback('heavy');
       }
     }
+
+    const latestScores = calculateScoresForDate(todayStr, goals, updatedLogs, userConfig);
+    checkAndUnlockBadges(
+      goals,
+      updatedLogs,
+      journals,
+      latestScores.composite,
+      latestScores.scores,
+      userConfig,
+      (updated) => {
+        setUserConfig(updated);
+        saveUserConfig(updated);
+        const newest = (updated.unlockedBadges || []).filter((id) => !(userConfig.unlockedBadges || []).includes(id));
+        if (newest[0] && completedGoal) {
+          triggerStreakToast(completedGoal.name, currentStreak, `Badge unlocked: ${newest[0].replace(/_/g, ' ')}`);
+        }
+      }
+    );
   };
 
   const handleToggleGoal = (goalId: string) => {
@@ -694,8 +717,9 @@ export default function App() {
     } else {
       updated = [goal, ...goals];
     }
-    setGoals(updated);
-    saveGoals(updated);
+    const capped = applyDailyCapToGoals(updated, capFromProfile(userConfig.behaviorProfile), dailyLogs, todayStr);
+    setGoals(capped);
+    saveGoals(capped);
   };
 
   const handleDeleteGoal = (goalId: string) => {
@@ -711,7 +735,12 @@ export default function App() {
       triggerStreakToast('Science Presets', 0, 'All science preset habits are already active in your tracker!');
       return;
     }
-    const updated = [...goals, ...newPresets];
+    const updated = applyDailyCapToGoals(
+      [...goals, ...newPresets],
+      capFromProfile(userConfig.behaviorProfile),
+      dailyLogs,
+      todayStr
+    );
     setGoals(updated);
     saveGoals(updated);
     triggerStreakToast('Science Presets', 0, `✨ Added ${newPresets.length} science-backed habit presets!`);
@@ -838,7 +867,7 @@ export default function App() {
         onExport={exportBackupJSON}
         onAnonymizeExport={exportAnonymizedBackupJSON}
         onImport={handleImportJSON}
-        onResetOnboarding={() => setShowOnboarding(true)}
+        onResetOnboarding={handleRerunGoalScout}
         settingsContent={
           <div className="space-y-4">
             <AiServerSettings
@@ -910,7 +939,9 @@ export default function App() {
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <div className="min-w-0">
               <p className="text-xs font-bold text-white">Plan Ready! ✨</p>
-              <p className="text-[11px] text-emerald-300 truncate">Tap to view your Master Blueprint & Goals</p>
+              <p className="text-[11px] text-emerald-300 truncate">
+                {userConfig.pendingPlanReview ? 'Tap to review and lock your goals' : 'Tap to view your Master Blueprint & Goals'}
+              </p>
             </div>
           </div>
           <span className="text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded-lg shrink-0">
@@ -952,6 +983,18 @@ export default function App() {
             onToggleGoal={handleToggleGoal}
             onNavigateTab={(tab) => setCurrentTab(tab as any)}
             onSaveJournal={handleSaveJournal}
+            onRerunGoalScout={handleRerunGoalScout}
+            onOpenPlanReview={
+              userConfig.pendingPlanReview
+                ? () => {
+                    const pending = userConfig.pendingPlanReview;
+                    if (!pending) return;
+                    const updated = { ...userConfig, pendingPlanReview: { ...pending, deferred: false } };
+                    setUserConfig(updated);
+                    saveUserConfig(updated);
+                  }
+                : undefined
+            }
             existingGoals={goals}
             dailyLogs={dailyLogs}
             journals={journals}
@@ -1036,6 +1079,20 @@ export default function App() {
           />
         )}
       </main>
+
+      {userConfig.pendingPlanReview?.blueprint && !isPlanBuilding && !userConfig.pendingPlanReview.deferred && (
+        <PlanReviewModal
+          blueprint={userConfig.pendingPlanReview.blueprint}
+          onConfirm={handleConfirmPlanReview}
+          onCancel={() => {
+            const pending = userConfig.pendingPlanReview;
+            if (!pending) return;
+            const updated = { ...userConfig, pendingPlanReview: { ...pending, deferred: true } };
+            setUserConfig(updated);
+            saveUserConfig(updated);
+          }}
+        />
+      )}
 
       {/* Onboarding AI Conversation Modal */}
       <OnboardingModal
