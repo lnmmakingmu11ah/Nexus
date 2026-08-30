@@ -174,6 +174,51 @@ export default function App() {
     saveUserConfig(updated);
   }, [dailyLogs, goals, userConfig.onboarded, userConfig.lastBlueprintRewriteAt, userConfig.masterBlueprint]);
 
+  // Automatically prompt for push notifications & location permissions on startup / onboarding
+  useEffect(() => {
+    if (!userConfig.onboarded) return;
+
+    // 1. Request Notification Permission
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission()
+        .then((perm) => {
+          if (perm === 'granted') {
+            try {
+              new Notification('NEXUS Notifications Enabled! 🎯', {
+                body: 'You will now receive smart reminders when your daily habits and goals are due.',
+              });
+            } catch {
+              /* ignore notification constructor errors on mobile */
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 2. Request Location Permission if not yet saved
+    if (!userConfig.locationOptIn && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const updated: UserConfig = {
+            ...userConfig,
+            locationOptIn: true,
+            coordinates: {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+            },
+          };
+          setUserConfig(updated);
+          saveUserConfig(updated);
+        },
+        () => {
+          /* permission denied or unavailable */
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 1000 * 60 * 60 }
+      );
+    }
+  }, [userConfig.onboarded]);
+
   /** Called by GoalIntakeChat when AI finishes synthesizing a plan */
   const handlePlanReady = useCallback((
     aiGoals: any[],
@@ -322,7 +367,11 @@ export default function App() {
         insight: d.rationale || 'Reinforces daily habit momentum',
       })),
       goalStackUps: [],
-      roadblocks: [],
+      // Preserve any roadblocks from the existing blueprint (they come from GoalScout synthesis)
+      roadblocks: userConfig.masterBlueprint?.roadblocks || [],
+      // Preserve lifetimeMegaGoals from existing blueprint
+      lifetimeMegaGoals: userConfig.masterBlueprint?.lifetimeMegaGoals || [],
+      extractedSetbacks: userConfig.masterBlueprint?.extractedSetbacks || [],
       createdAt: new Date().toISOString(),
     };
 

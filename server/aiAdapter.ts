@@ -921,7 +921,7 @@ PILLAR MAPPING (for your notes):
 
 TEXTING STYLE:
 - Sound like a real person texting a friend, not a chatbot. Mostly lowercase. Contractions. Short when they are short, longer when the topic is real.
-- Emojis only when they actually fit (0-2). Never emoji-spam. Don't start every reply the same way.
+- Use smiley and face emojis FREELY and naturally 😊 😄 💪 🔥 ✨ 🙌 😎 🫶 🤩 😂 💀 🫡 🎯 — they should appear in most messages like a real texter. Avoid using the same emoji twice in a row.
 - React to what they just said first. One question max. Don't lecture.
 - ${bubbleInstruction}
 ${userTurnsCount >= 8 && coverage.nextPriority === 'complete' ? '\nYou have enough! Briefly celebrate what you learned, then end with: <<READY_FOR_PLAN>> on its own line.' : ''}
@@ -936,7 +936,7 @@ HOW A REAL PERSON TEXTS (do this):
 - Match their energy and length. "hey" gets a short reply. A vent gets a real reply.
 - Mostly lowercase. Periods optional. Fragments are fine. Don't write essays unless they opened up.
 - Slang only if it fits the sentence (ngl tbh fr rn gonna wanna idk). Don't stack slang. Don't force "lowkey" every line.
-- Emojis sparingly (0-2), only when you'd actually send one. Never decorate every sentence.
+- Use smiley and face emojis FREELY and naturally 😊 😄 💪 🔥 ✨ 😂 😎 🙌 🫶 🤩 💀 🫡 😭 — use them in most messages like a real texter would. Avoid using the same emoji twice in a row.
 - Don't start every message with okay/gotchu/bet/yo. Vary openings. Sometimes no opener — just the thought.
 - ${bubbleInstruction}
 - Good double-text: "wait" then the actual point. Bad: three similar paragraphs, or splitting one sentence.
@@ -1408,10 +1408,11 @@ RULES:
 4. Calibrate categoryBaselines: never-mentioned pillar = 20-30, struggling = 25-40, moderate = 45-55, strong = 60-75.
 5. goalCorrelations: link goals that reinforce each other when one is achieved (use EXACT goal names from plannedGoals).
 6. goalStackUps: primaryGoal gets supportingGoals stacked onto it (e.g. morning walk stacks before learning session).
-7. roadblocks: extract from transcript — procrastination, addiction, overwhelm. Each MUST include affectedGoals[] with exact goal names it threatens.
+7. ROADBLOCKS (CRITICAL): Extract EVERY setback, struggle, addiction, or failure pattern the user mentioned (e.g. PMO, laziness, procrastination, phone addiction, binge eating, lack of discipline, distraction, anxiety). Create a separate roadblock entry for EACH one with a specific, practical solution and list all goals it threatens in affectedGoals[]. Do NOT skip any setback the user mentioned.
 8. Timelines: use research context for realistic mastery timelines. Foundation phase (days 1-30), scaling (30-90), mastery (90+). Lifelong goals may have estimatedDaysToMastery of 365-1095+.
 9. userProfileSummary: 2-3 sentences on who they are (location, work, relationships).
-10. extractedSetbacks: array of setback strings from the chat.
+10. extractedSetbacks: array of setback strings from the chat — be exhaustive, list every single one.
+11. lifetimeMegaGoals: Extract BIG ASPIRATIONAL goals the user stated that are ENDPOINTS not habits (e.g. "become a millionaire", "have an 80kg physique", "become a doctor", "own a house", "start a business"). These are DESTINATION goals, not daily habits. List them all here even if they overlap with plannedGoals — they show the user's ultimate vision.
 
 Return JSON only.`,
           },
@@ -1458,7 +1459,8 @@ Return JSON:
   }],
   "goalCorrelations": [{ "goals": ["Exact Goal Name 1", "Exact Goal Name 2"], "insight": "how achieving one aids the other" }],
   "goalStackUps": [{ "primaryGoal": "Primary Goal Name", "supportingGoals": ["Supporting Habit"], "rationale": "why stacking works" }],
-  "roadblocks": [{ "roadblock": "...", "solution": "practical workaround", "affectedGoals": ["Goal Name"] }]
+  "roadblocks": [{ "roadblock": "exact setback name (e.g. PMO, laziness, phone addiction)", "solution": "specific practical strategy to overcome it with accountability steps", "affectedGoals": ["Goal Name 1", "Goal Name 2"] }],
+  "lifetimeMegaGoals": [{ "title": "Become a Millionaire", "description": "what achieving this looks like", "timelineEstimate": "5-10 years", "category": "smarts|health|happiness|spiritual|selfCare|life" }]
 }`,
           },
         ],
@@ -1472,7 +1474,11 @@ Return JSON:
             )
           : [];
         const blueprint = normalizeBlueprint(
-          { ...parsed, plannedGoals: normalizedGoals },
+          {
+            ...parsed,
+            plannedGoals: normalizedGoals,
+            lifetimeMegaGoals: Array.isArray(parsed.lifetimeMegaGoals) ? parsed.lifetimeMegaGoals : [],
+          },
           transcript,
           identity
         );
@@ -1524,7 +1530,7 @@ Return JSON:
 
     const system = `${phaseInstructions[params.intakePhase] || phaseInstructions.discovery}
 
-Casual texting tone — supportive friend on their phone with natural face emojis. No big question lists; one clean question per turn unless the user asks for a list.
+Casual texting tone — supportive friend on their phone with smiley face emojis 😊 😄 💪 🔥 ✨ — use emojis freely in most messages like a real texter. No big question lists; one clean question per turn unless the user asks for a list.
 User: ${params.userName || 'friend'}
 Goals so far: ${JSON.stringify(params.collectedGoals?.slice(0, 5) || (params as any).collectedInfo || [])}
 Constraints: ${JSON.stringify(params.constraints || {})}

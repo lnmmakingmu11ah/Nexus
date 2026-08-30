@@ -290,6 +290,50 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
+      {/* Major Life Targets Banner (Ultimate Endpoints) */}
+      {((userConfig.masterBlueprint?.lifetimeMegaGoals && userConfig.masterBlueprint.lifetimeMegaGoals.length > 0) ||
+        (userConfig.userIdentity?.lifeGoals && userConfig.userIdentity.lifeGoals.length > 0)) && (
+        <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-black border border-amber-500/25 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start space-x-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+              <Crown className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white tracking-tight">Major Life Targets</h3>
+                <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                  Ultimate Endpoints
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-1.5">
+                {(userConfig.masterBlueprint?.lifetimeMegaGoals || (userConfig.userIdentity?.lifeGoals || []).map((g) => ({ title: g, timelineEstimate: 'Long-term' }))).slice(0, 4).map((mg, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 font-medium"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                    <span>{mg.title}</span>
+                    {mg.timelineEstimate && (
+                      <span className="text-[10px] text-zinc-500 font-mono">({mg.timelineEstimate})</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          {onNavigateTab && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab('aicoach')}
+              className="self-start sm:self-auto shrink-0 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl border border-zinc-700 transition-colors flex items-center gap-1"
+            >
+              <span>View Blueprint</span>
+              <ArrowRight className="w-3 h-3 text-amber-400" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Composite Life Score & Overview Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         {/* Radar Chart Section (7 cols) */}

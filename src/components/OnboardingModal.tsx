@@ -84,6 +84,25 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
       tutorialCompleted: false,
     };
 
+    // Request permissions proactively on user interaction
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    if (typeof navigator !== 'undefined' && navigator.geolocation && !initialConfig.locationOptIn) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          partialConfig.locationOptIn = true;
+          partialConfig.coordinates = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+          };
+        },
+        () => {},
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 1000 * 60 * 60 }
+      );
+    }
+
     if (onStartBackgroundPlan) {
       onStartBackgroundPlan(transcript, partialConfig);
     } else {

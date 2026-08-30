@@ -286,6 +286,45 @@ export function extractGoalHintsFromTranscript(
   return substantial.slice(0, 3).map((goalType) => ({ category: 'smarts' as CategoryKey, goalType: goalType.slice(0, 80) }));
 }
 
+export function ensureRoadblockCoverage(
+  roadblocks: NormalizedRoadblock[],
+  extractedSetbacks: string[] = [],
+  goals: { name: string }[] = []
+): NormalizedRoadblock[] {
+  const result = [...roadblocks];
+  const existingRoadblocksLower = new Set(result.map((r) => (r.roadblock || '').toLowerCase()));
+
+  for (const setback of extractedSetbacks) {
+    const sLower = (setback || '').toLowerCase().trim();
+    if (!sLower) continue;
+    const isAlreadyCovered = Array.from(existingRoadblocksLower).some(
+      (r) => r.includes(sLower) || sLower.includes(r)
+    );
+    if (!isAlreadyCovered) {
+      let solution = 'Establish high friction for triggers, schedule non-negotiable anchor routines, and use micro-commitments.';
+      if (/pmo|porn|adult|masturbat/i.test(sLower)) {
+        solution = 'Install digital friction (content blockers, DNS filters), remove devices from the bedroom at night, and deploy an immediate physical redirection (cold water reset or 15 pushups).';
+      } else if (/laziness|lazy|sloth|unmotivated|motivation/i.test(sLower)) {
+        solution = 'Use the 2-minute rule micro-activation: start with the absolute minimum viable step (e.g. putting on shoes) without waiting for motivation to strike.';
+      } else if (/procrastinat/i.test(sLower)) {
+        solution = "Implementation intentions ('At [time] in [place], I immediately execute step 1') combined with single-tasking 25-minute Pomodoro sprints.";
+      } else if (/phone|screen|doomscroll|social media/i.test(sLower)) {
+        solution = 'Enable grayscale display mode, set lockscreen app time limits, and keep the phone in another room during focus hours and morning routines.';
+      } else if (/inconsisten|busy|time|overwhelm/i.test(sLower)) {
+        solution = 'Anchor habits to non-negotiable daily cues (e.g., right after brushing teeth) and define a 2-minute emergency fallback version for chaotic days.';
+      }
+
+      result.push({
+        roadblock: setback,
+        solution,
+        affectedGoals: goals.slice(0, 2).map((g) => g.name),
+      });
+      existingRoadblocksLower.add(sLower);
+    }
+  }
+  return result;
+}
+
 export function normalizeBlueprint(
   blueprint: Record<string, unknown>,
   transcript: { sender: 'user' | 'ai'; text: string }[] = [],
@@ -307,8 +346,18 @@ export function normalizeBlueprint(
   plannedGoals = ensurePillarCoverage(plannedGoals, coverage);
   plannedGoals = capDailyPlannedGoals(plannedGoals, STRUGGLING_CAP);
 
+  const allSetbacks = Array.from(
+    new Set([
+      ...((Array.isArray(blueprint.extractedSetbacks) ? blueprint.extractedSetbacks : []) as string[]),
+      ...(identity?.setbacks || []),
+    ])
+  );
+
+  let rawRoadblocks = (Array.isArray(blueprint.roadblocks) ? blueprint.roadblocks : []) as NormalizedRoadblock[];
+  rawRoadblocks = ensureRoadblockCoverage(rawRoadblocks, allSetbacks, plannedGoals);
+
   const roadblocks = linkRoadblocksToGoals(
-    (Array.isArray(blueprint.roadblocks) ? blueprint.roadblocks : []) as NormalizedRoadblock[],
+    rawRoadblocks,
     plannedGoals
   );
 
@@ -322,10 +371,34 @@ export function normalizeBlueprint(
     .map((g) => `${g.name}: ${g.autoAddedReason}`)
     .join(' ');
 
+  let lifetimeMegaGoals = (Array.isArray(blueprint.lifetimeMegaGoals) ? blueprint.lifetimeMegaGoals : []) as {
+    title: string;
+    description?: string;
+    timelineEstimate?: string;
+    category?: string;
+  }[];
+
+  if (identity?.lifeGoals?.length) {
+    const existingTitles = new Set(lifetimeMegaGoals.map((g) => (g.title || '').toLowerCase()));
+    for (const lg of identity.lifeGoals) {
+      if (lg && lg.trim() && !existingTitles.has(lg.toLowerCase())) {
+        lifetimeMegaGoals.push({
+          title: lg.trim(),
+          description: 'Major lifetime vision target identified from Goal Scout',
+          timelineEstimate: 'Long-term arc',
+          category: 'life',
+        });
+        existingTitles.add(lg.toLowerCase());
+      }
+    }
+  }
+
   return {
     ...blueprint,
     plannedGoals,
     roadblocks,
+    lifetimeMegaGoals,
+    extractedSetbacks: allSetbacks.length ? allSetbacks : blueprint.extractedSetbacks,
     categoryBaselines,
     pillarAutoFillNotes: autoAddedNotes || undefined,
     intakeSummary: {

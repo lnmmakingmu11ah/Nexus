@@ -18,9 +18,14 @@ import {
   Activity,
   ShieldAlert,
   TrendingUp,
+  Edit2,
+  Trash2,
+  X,
+  Check,
+  Crown,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { UserConfig, AIChatMessage, Goal, DailyGoalLog, DailyJournal, CATEGORY_NAMES, CATEGORY_COLORS } from '../types';
+import { UserConfig, AIChatMessage, Goal, DailyGoalLog, DailyJournal, CATEGORY_NAMES, CATEGORY_COLORS, LifetimeMegaGoal, CategoryKey } from '../types';
 import { aiClient } from '../services/aiClient';
 import { calculateWillpowerAnalytics } from '../utils/willpowerAnalytics';
 import { apiOfflineMessage, smartOfflineReply } from '../utils/chatFallback';
@@ -234,6 +239,15 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
   const [addedGoalNames, setAddedGoalNames] = useState<Set<string>>(
     new Set(existingGoals.map((g) => g.name.toLowerCase()))
   );
+
+  // Mega Goals & Planned Goals Edit State
+  const [showMegaGoalModal, setShowMegaGoalModal] = useState(false);
+  const [editingMegaGoal, setEditingMegaGoal] = useState<Partial<LifetimeMegaGoal> | null>(null);
+  const [editingMegaGoalIndex, setEditingMegaGoalIndex] = useState<number | null>(null);
+
+  const [showPlannedGoalModal, setShowPlannedGoalModal] = useState(false);
+  const [editingPlannedGoal, setEditingPlannedGoal] = useState<any | null>(null);
+  const [editingPlannedGoalIndex, setEditingPlannedGoalIndex] = useState<number | null>(null);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -509,6 +523,149 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
     setAddedGoalNames((prev) => new Set(prev).add(planned.name.toLowerCase()));
   };
 
+  const handleOpenNewMegaGoal = () => {
+    setEditingMegaGoal({
+      title: '',
+      description: '',
+      timelineEstimate: '3-5 years',
+      category: 'life',
+    });
+    setEditingMegaGoalIndex(null);
+    setShowMegaGoalModal(true);
+  };
+
+  const handleOpenEditMegaGoal = (goal: LifetimeMegaGoal, index: number) => {
+    setEditingMegaGoal({ ...goal });
+    setEditingMegaGoalIndex(index);
+    setShowMegaGoalModal(true);
+  };
+
+  const handleSaveMegaGoal = () => {
+    if (!editingMegaGoal?.title?.trim()) return;
+    const currentMega = [...(userConfig.masterBlueprint?.lifetimeMegaGoals || [])];
+    const newEntry: LifetimeMegaGoal = {
+      title: editingMegaGoal.title.trim(),
+      description: editingMegaGoal.description?.trim() || '',
+      timelineEstimate: editingMegaGoal.timelineEstimate?.trim() || 'Long-term',
+      category: editingMegaGoal.category || 'life',
+    };
+
+    if (editingMegaGoalIndex !== null && editingMegaGoalIndex >= 0) {
+      currentMega[editingMegaGoalIndex] = newEntry;
+    } else {
+      currentMega.push(newEntry);
+    }
+
+    const updatedBlueprint = {
+      ...(userConfig.masterBlueprint || {
+        userName: userConfig.userName || 'Champion',
+        masterVision: userConfig.lifePathGoal || 'Living with purpose and focus',
+        createdAt: new Date().toISOString(),
+        plannedGoals: [],
+        roadblocks: [],
+      }),
+      lifetimeMegaGoals: currentMega,
+    };
+
+    onUpdateUserConfig({
+      ...userConfig,
+      masterBlueprint: updatedBlueprint,
+    });
+    setShowMegaGoalModal(false);
+    setEditingMegaGoal(null);
+    setEditingMegaGoalIndex(null);
+  };
+
+  const handleDeleteMegaGoal = (index: number) => {
+    const currentMega = [...(userConfig.masterBlueprint?.lifetimeMegaGoals || [])];
+    currentMega.splice(index, 1);
+    const updatedBlueprint = {
+      ...userConfig.masterBlueprint!,
+      lifetimeMegaGoals: currentMega,
+    };
+    onUpdateUserConfig({
+      ...userConfig,
+      masterBlueprint: updatedBlueprint,
+    });
+  };
+
+  const handleOpenNewPlannedGoal = () => {
+    setEditingPlannedGoal({
+      name: '',
+      description: '',
+      category: 'health',
+      reminderTime: '08:00',
+      basePoints: 5,
+      targetFrequency: 'daily',
+      chanceOfAchievement: 85,
+      willpowerStrain: 'Low',
+      timelinePhase1: 'Days 1–30: Foundation',
+      timelinePhase2: 'Days 30–90: Consistency',
+      timelinePhase3: 'Days 90+: Mastery',
+      timelineSummary: 'Mastery arc',
+    });
+    setEditingPlannedGoalIndex(null);
+    setShowPlannedGoalModal(true);
+  };
+
+  const handleOpenEditPlannedGoal = (goal: any, index: number) => {
+    setEditingPlannedGoal({ ...goal });
+    setEditingPlannedGoalIndex(index);
+    setShowPlannedGoalModal(true);
+  };
+
+  const handleSavePlannedGoal = () => {
+    if (!editingPlannedGoal?.name?.trim()) return;
+    const currentGoals = [...(userConfig.masterBlueprint?.plannedGoals || [])];
+    const newEntry = {
+      ...editingPlannedGoal,
+      name: editingPlannedGoal.name.trim(),
+      description: editingPlannedGoal.description?.trim() || '',
+      category: editingPlannedGoal.category || 'health',
+      reminderTime: editingPlannedGoal.reminderTime || '08:00',
+      targetFrequency: editingPlannedGoal.targetFrequency || 'daily',
+      basePoints: editingPlannedGoal.basePoints || 5,
+    };
+
+    if (editingPlannedGoalIndex !== null && editingPlannedGoalIndex >= 0) {
+      currentGoals[editingPlannedGoalIndex] = newEntry;
+    } else {
+      currentGoals.push(newEntry);
+    }
+
+    const updatedBlueprint = {
+      ...(userConfig.masterBlueprint || {
+        userName: userConfig.userName || 'Champion',
+        masterVision: userConfig.lifePathGoal || 'Living with purpose',
+        createdAt: new Date().toISOString(),
+        plannedGoals: [],
+        roadblocks: [],
+      }),
+      plannedGoals: currentGoals,
+    };
+
+    onUpdateUserConfig({
+      ...userConfig,
+      masterBlueprint: updatedBlueprint,
+    });
+    setShowPlannedGoalModal(false);
+    setEditingPlannedGoal(null);
+    setEditingPlannedGoalIndex(null);
+  };
+
+  const handleDeletePlannedGoal = (index: number) => {
+    const currentGoals = [...(userConfig.masterBlueprint?.plannedGoals || [])];
+    currentGoals.splice(index, 1);
+    const updatedBlueprint = {
+      ...userConfig.masterBlueprint!,
+      plannedGoals: currentGoals,
+    };
+    onUpdateUserConfig({
+      ...userConfig,
+      masterBlueprint: updatedBlueprint,
+    });
+  };
+
   const blueprint = userConfig.masterBlueprint;
 
   // Calculate Willpower & Goal Likelihood Analytics
@@ -645,6 +802,84 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
             </div>
           )}
 
+          {/* Major Lifetime Goals & Endpoints (Beyond the 5 Daily Pillars) */}
+          <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span>Major Life Targets & Endpoints</span>
+                </div>
+                <p className="text-xs text-zinc-400 font-light mt-0.5">
+                  Big destination goals beyond daily habit categories (e.g. Become a millionaire, 80kg athletic physique, start a venture).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenNewMegaGoal}
+                className="self-start sm:self-auto px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Major Goal</span>
+              </button>
+            </div>
+
+            {((blueprint?.lifetimeMegaGoals && blueprint.lifetimeMegaGoals.length > 0) ||
+              (userConfig.userIdentity?.lifeGoals && userConfig.userIdentity.lifeGoals.length > 0)) ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(blueprint?.lifetimeMegaGoals || (userConfig.userIdentity?.lifeGoals || []).map((g) => ({ title: g, description: 'Major life target', timelineEstimate: 'Long-term', category: 'life' }))).map((mg: LifetimeMegaGoal, idx: number) => (
+                  <div
+                    key={idx}
+                    className="bg-zinc-900/90 border border-amber-500/20 hover:border-amber-500/40 p-4 rounded-xl space-y-2.5 flex flex-col justify-between transition-all group"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-[9px] font-mono font-bold text-amber-400 uppercase bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-md">
+                          {mg.timelineEstimate || 'Lifetime Target'}
+                        </span>
+                        <div className="flex items-center space-x-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditMegaGoal(mg, idx)}
+                            className="p-1 text-zinc-400 hover:text-amber-300 transition-colors"
+                            title="Edit Major Goal"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMegaGoal(idx)}
+                            className="p-1 text-zinc-400 hover:text-rose-400 transition-colors"
+                            title="Remove"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <h4 className="text-sm font-bold text-white tracking-tight">{mg.title}</h4>
+                      {mg.description && (
+                        <p className="text-xs text-zinc-300 font-light leading-relaxed">
+                          {mg.description}
+                        </p>
+                      )}
+                    </div>
+                    {mg.category && (
+                      <div className="text-[10px] text-zinc-500 font-mono">
+                        Domain: <span className="text-zinc-300">{mg.category}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 bg-zinc-900/40 border border-zinc-800/60 rounded-xl text-center space-y-2">
+                <p className="text-xs text-zinc-400">
+                  No major lifetime targets added yet. Click &ldquo;Add Major Goal&rdquo; to add your ultimate visions like &ldquo;Become a Millionaire&rdquo; or &ldquo;80kg Athletic Body&rdquo;.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* AI Calculated Willpower & Goal Likelihood Overview */}
           <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
@@ -716,14 +951,24 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
           {/* AI Planned Goals & Realistic Timelines */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-white flex items-center space-x-2">
-                <Target className="w-5 h-5 text-amber-400" />
-                <span>Synthesized Goals & Realistic Timelines</span>
-              </h3>
-              <span className="text-xs text-zinc-400">
-                {blueprint?.plannedGoals?.length || 0} Custom Planned Goals
-              </span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                  <Target className="w-5 h-5 text-amber-400" />
+                  <span>Synthesized Goals & Realistic Timelines</span>
+                </h3>
+                <span className="text-xs text-zinc-400">
+                  {blueprint?.plannedGoals?.length || 0} Custom Planned Goals
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenNewPlannedGoal}
+                className="self-start sm:self-auto px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Goal</span>
+              </button>
             </div>
 
             {blueprint?.plannedGoals && blueprint.plannedGoals.length > 0 ? (
@@ -752,12 +997,30 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
                             )}
                           </div>
                           <div className="flex flex-col items-end gap-1 shrink-0">
-                            {planned.reminderTime && (
-                              <div className="text-[11px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-lg flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-amber-400" />
-                                <span>{planned.reminderTime}</span>
-                              </div>
-                            )}
+                            <div className="flex items-center space-x-1">
+                              {planned.reminderTime && (
+                                <div className="text-[11px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-amber-400" />
+                                  <span>{planned.reminderTime}</span>
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditPlannedGoal(planned, idx)}
+                                className="p-1 text-zinc-400 hover:text-amber-300 transition-colors"
+                                title="Edit Goal"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePlannedGoal(idx)}
+                                className="p-1 text-zinc-400 hover:text-rose-400 transition-colors"
+                                title="Remove Goal"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                             <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                               {chance}% Chance
                             </span>
@@ -1013,6 +1276,225 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
               <Send className="w-4 h-4" />
               <span>Send</span>
             </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: Add / Edit Major Lifetime Mega Goal ─── */}
+      {showMegaGoalModal && editingMegaGoal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-amber-500/30 rounded-2xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 text-zinc-100">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                <Crown className="w-4 h-4 text-amber-400" />
+                <span>{editingMegaGoalIndex !== null ? 'Edit Major Life Target' : 'Add Major Life Target'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => { setShowMegaGoalModal(false); setEditingMegaGoal(null); }}
+                className="text-zinc-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                  Major Goal Title *
+                </label>
+                <input
+                  type="text"
+                  value={editingMegaGoal.title || ''}
+                  onChange={(e) => setEditingMegaGoal({ ...editingMegaGoal, title: e.target.value })}
+                  placeholder="e.g. Become a Millionaire, 80kg Athletic Body"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                    Timeline Arc
+                  </label>
+                  <input
+                    type="text"
+                    value={editingMegaGoal.timelineEstimate || ''}
+                    onChange={(e) => setEditingMegaGoal({ ...editingMegaGoal, timelineEstimate: e.target.value })}
+                    placeholder="e.g. 3-5 years, 10 years"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/60"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                    Domain / Category
+                  </label>
+                  <input
+                    type="text"
+                    value={editingMegaGoal.category || ''}
+                    onChange={(e) => setEditingMegaGoal({ ...editingMegaGoal, category: e.target.value })}
+                    placeholder="e.g. Wealth, Fitness, Career"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/60"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                  Description / Success Criteria
+                </label>
+                <textarea
+                  value={editingMegaGoal.description || ''}
+                  onChange={(e) => setEditingMegaGoal({ ...editingMegaGoal, description: e.target.value })}
+                  placeholder="What will your life look like when this is achieved? What is the core metric?"
+                  rows={3}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => { setShowMegaGoalModal(false); setEditingMegaGoal(null); }}
+                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveMegaGoal}
+                disabled={!editingMegaGoal.title?.trim()}
+                className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-zinc-950 text-xs font-bold rounded-xl shadow-md"
+              >
+                Save Target
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: Add / Edit Blueprint Planned Habit Goal ─── */}
+      {showPlannedGoalModal && editingPlannedGoal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-amber-500/30 rounded-2xl p-5 sm:p-6 max-w-lg w-full shadow-2xl space-y-4 text-zinc-100 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                <Target className="w-4 h-4 text-amber-400" />
+                <span>{editingPlannedGoalIndex !== null ? 'Edit Blueprint Goal' : 'Add Goal to Blueprint'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => { setShowPlannedGoalModal(false); setEditingPlannedGoal(null); }}
+                className="text-zinc-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                  Goal Name *
+                </label>
+                <input
+                  type="text"
+                  value={editingPlannedGoal.name || ''}
+                  onChange={(e) => setEditingPlannedGoal({ ...editingPlannedGoal, name: e.target.value })}
+                  placeholder="e.g. Weight Training (Push/Pull/Legs), Reading 20 Pages"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                  Execution Description
+                </label>
+                <textarea
+                  value={editingPlannedGoal.description || ''}
+                  onChange={(e) => setEditingPlannedGoal({ ...editingPlannedGoal, description: e.target.value })}
+                  placeholder="Specific daily/weekly action steps to execute this habit"
+                  rows={2}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                    Life Pillar
+                  </label>
+                  <select
+                    value={editingPlannedGoal.category || 'health'}
+                    onChange={(e) => setEditingPlannedGoal({ ...editingPlannedGoal, category: e.target.value as CategoryKey })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500/60"
+                  >
+                    <option value="health">Health (Physicality)</option>
+                    <option value="smarts">Smarts (Learning/Career)</option>
+                    <option value="selfCare">Self Care (Rest/Recovery)</option>
+                    <option value="happiness">Happiness (Joy/Fun)</option>
+                    <option value="spiritual">Spiritual (Purpose/Mind)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                    Frequency
+                  </label>
+                  <select
+                    value={editingPlannedGoal.targetFrequency || 'daily'}
+                    onChange={(e) => setEditingPlannedGoal({ ...editingPlannedGoal, targetFrequency: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500/60"
+                  >
+                    <option value="daily">Daily Habit</option>
+                    <option value="weekly">Weekly Target</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                    Reminder Time
+                  </label>
+                  <input
+                    type="time"
+                    value={editingPlannedGoal.reminderTime || '08:00'}
+                    onChange={(e) => setEditingPlannedGoal({ ...editingPlannedGoal, reminderTime: e.target.value })}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500/60"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                  Timeline / Arc Notes
+                </label>
+                <input
+                  type="text"
+                  value={editingPlannedGoal.timelineSummary || ''}
+                  onChange={(e) => setEditingPlannedGoal({ ...editingPlannedGoal, timelineSummary: e.target.value })}
+                  placeholder="e.g. 6-month ramp to 80kg or career milestone"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/60"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-3 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => { setShowPlannedGoalModal(false); setEditingPlannedGoal(null); }}
+                className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePlannedGoal}
+                disabled={!editingPlannedGoal.name?.trim()}
+                className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-zinc-950 text-xs font-bold rounded-xl shadow-md"
+              >
+                Save Goal
+              </button>
             </div>
           </div>
         </div>

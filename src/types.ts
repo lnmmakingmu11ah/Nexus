@@ -115,6 +115,14 @@ export interface BlueprintRoadblock {
   affectedGoals?: string[];
 }
 
+/** A big aspirational endpoint goal the user wants to achieve in their lifetime */
+export interface LifetimeMegaGoal {
+  title: string;
+  description?: string;
+  timelineEstimate?: string; // e.g. "5-10 years"
+  category?: string; // broad category hint
+}
+
 export interface MasterBlueprint {
   userName: string;
   masterVision: string;
@@ -127,6 +135,7 @@ export interface MasterBlueprint {
   pillarAutoFillNotes?: string;
   userProfileSummary?: string;
   extractedSetbacks?: string[];
+  lifetimeMegaGoals?: LifetimeMegaGoal[];
   intakeSummary?: {
     profileComplete?: boolean;
     lifeGoalsDiscussed?: boolean;
