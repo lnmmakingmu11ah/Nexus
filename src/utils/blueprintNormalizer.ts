@@ -1,6 +1,7 @@
 /**
  * blueprintNormalizer.ts — Deterministic post-processing for AI blueprints.
- * Ensures pillar coverage, links setbacks to goals, and improves goal matching.
+ * Ensures passive category mapping, diagnostic coverage, Phase 1 blocker neutralization,
+ * and multi-tier progressive roadmap structure.
  */
 
 import { CategoryKey, CategoryScores, UserIdentity } from '../types';
@@ -9,7 +10,46 @@ import { heuristicIdentityFromTranscript, mergeIdentity } from './userIdentity';
 
 export const ALL_PILLARS: CategoryKey[] = ['health', 'smarts', 'selfCare', 'happiness', 'spiritual'];
 
+/**
+ * Maps any user goal domain (financial, career, technical, wellness, etc.)
+ * to a passive tracking category purely for background metrics and chart display.
+ */
+export function mapToPassiveCategory(
+  rawCategory?: string,
+  title = '',
+  description = ''
+): CategoryKey {
+  const text = `${rawCategory || ''} ${title} ${description}`.toLowerCase();
+
+  if (ALL_PILLARS.includes(rawCategory as CategoryKey)) {
+    return rawCategory as CategoryKey;
+  }
+
+  if (/health|physic|body|fitness|workout|gym|run|walk|cardio|lift|muscle|fat loss|weight|diet|nutrition|sleep|stamina/i.test(text)) {
+    return 'health';
+  }
+  if (/spiritual|spirit|purpose|meaning|meditat|mindful|pray|faith|soul|inner peace|gratitude|values|stoic/i.test(text)) {
+    return 'spiritual';
+  }
+  if (/self-?care|rest|recover|burnout|unwind|recharge|boundary|boundaries|hygiene|skincare|mental health/i.test(text)) {
+    return 'selfCare';
+  }
+  if (/happiness|joy|fun|hobby|social|friend|family|relationship|date|dates|art|music|creative|play/i.test(text)) {
+    return 'happiness';
+  }
+  // Default passive monitoring tag for career, money, skills, learning, business, tech, or uncategorized ambitions
+  return 'smarts';
+}
+
 export interface IntakeCoverage {
+  diagnostic: {
+    specificGoal: boolean;      // 1. Specific Goal & Scope
+    currentBaseline: boolean;   // 2. Current Baseline
+    primaryBlocker: boolean;    // 3. Primary Blocker / Setback
+    timeCommitment: boolean;    // 4. Time & Resource Commitment
+  };
+  diagnosticComplete: boolean;
+
   profile: { name: boolean; location: boolean; work: boolean; relationships: boolean };
   lifeGoals: boolean;
   pillars: Record<CategoryKey, boolean>;
@@ -18,40 +58,8 @@ export interface IntakeCoverage {
   userTurnCount: number;
   lastUserTopic: string;
   uncoveredPillars: CategoryKey[];
-  nextPriority: 'profile' | 'lifeGoals' | 'pillars' | 'setbacks' | 'capacity' | 'complete';
+  nextPriority: 'specificGoal' | 'currentBaseline' | 'primaryBlocker' | 'timeCommitment' | 'profile' | 'lifeGoals' | 'pillars' | 'setbacks' | 'capacity' | 'complete';
 }
-
-/** Foundational habits auto-added when a pillar was never discussed */
-export const PILLAR_DEFAULT_GOALS: Record<
-  CategoryKey,
-  { name: string; description: string; reminderTime: string }
-> = {
-  health: {
-    name: 'Daily Movement (20 min walk)',
-    description: 'A gentle daily walk to build physical consistency — NEXUS added this because health was not discussed.',
-    reminderTime: '07:30',
-  },
-  smarts: {
-    name: 'Daily Learning (10 pages or 20 min)',
-    description: 'Focused reading or study to keep your mind sharp — NEXUS added this because learning goals were not discussed.',
-    reminderTime: '08:30',
-  },
-  selfCare: {
-    name: 'Sleep & Recovery Target (7 hrs)',
-    description: 'Protect 7 hours of sleep as a non-negotiable self-care anchor — NEXUS added this because rest was not discussed.',
-    reminderTime: '22:00',
-  },
-  happiness: {
-    name: 'One Joyful Thing Today',
-    description: 'Do one thing purely for fun or connection each day — NEXUS added this because happiness/joy was not discussed.',
-    reminderTime: '18:00',
-  },
-  spiritual: {
-    name: '5-Min Gratitude or Stillness',
-    description: 'A brief gratitude note or quiet moment to connect with purpose — NEXUS added this because spirituality was not discussed.',
-    reminderTime: '21:00',
-  },
-};
 
 export function analyzeIntakeCoverage(
   transcript: { sender: 'user' | 'ai'; text: string }[] = [],
@@ -60,6 +68,7 @@ export function analyzeIntakeCoverage(
   const safeTranscript = Array.isArray(transcript) ? transcript : [];
   const userMessages = safeTranscript.filter((m) => m && m.sender === 'user').map((m) => m.text || '');
   const lastUser = userMessages[userMessages.length - 1] || '';
+  const userCombinedText = userMessages.join('\n').toLowerCase();
   const id = mergeIdentity(identity, heuristicIdentityFromTranscript(safeTranscript, identity));
 
   const pillars = {} as Record<CategoryKey, boolean>;
@@ -74,30 +83,51 @@ export function analyzeIntakeCoverage(
     relationships: Boolean(id.relationships),
   };
 
-  const lifeGoals = (id.lifeGoals || []).length > 0;
-  const setbacks = (id.setbacks || []).length > 0;
-  const dailyCapacity = Boolean(id.dailyCapacity || id.preferredTime);
+  // 1. Specific Goal & Scope
+  const hasSpecificGoal = (id.lifeGoals || []).length > 0 ||
+    /want to|wanna|goal is|trying to|dream of|become a|build a|lose \d+|make \d+|earn|learn|master|reach/i.test(userCombinedText);
+
+  // 2. Current Baseline
+  const hasCurrentBaseline = Boolean(id.currentBaseline) ||
+    /starting from|currently at|right now i|baseline|zero savings|starting scratch|beginner|intermediate|advanced|have \d+|no experience/i.test(userCombinedText);
+
+  // 3. Primary Blocker / Setback
+  const hasPrimaryBlocker = (id.primaryBlockers || []).length > 0 || (id.setbacks || []).length > 0 ||
+    /holding me back|blocker|struggle|lazy|laziness|procrastinat|lack of|poor time|distraction|phone|discipline|focus|burnout|afraid|fear/i.test(userCombinedText);
+
+  // 4. Time & Resource Commitment
+  const hasTimeCommitment = Boolean(id.dailyCapacity || id.preferredTime) ||
+    /\d+\s*(?:hour|hr|min|minute)s?|commit|hours? a day|hours? per week|every day|weekends/i.test(userCombinedText);
+
+  const diagnosticComplete = hasSpecificGoal && hasCurrentBaseline && hasPrimaryBlocker && hasTimeCommitment;
+
+  const lifeGoals = hasSpecificGoal;
+  const setbacks = hasPrimaryBlocker;
+  const dailyCapacity = hasTimeCommitment;
   const uncoveredPillars = ALL_PILLARS.filter((p) => !pillars[p]);
 
-  let nextPriority: IntakeCoverage['nextPriority'] = 'profile';
-  if (!profile.name || (!profile.location && !profile.work)) {
-    nextPriority = 'profile';
-  } else if (!lifeGoals) {
-    nextPriority = 'lifeGoals';
-  } else if (uncoveredPillars.length > 2) {
-    nextPriority = 'pillars';
-  } else if (!setbacks) {
-    nextPriority = 'setbacks';
-  } else if (!dailyCapacity) {
-    nextPriority = 'capacity';
+  let nextPriority: IntakeCoverage['nextPriority'] = 'specificGoal';
+  if (!hasSpecificGoal) {
+    nextPriority = 'specificGoal';
+  } else if (!hasCurrentBaseline) {
+    nextPriority = 'currentBaseline';
+  } else if (!hasPrimaryBlocker) {
+    nextPriority = 'primaryBlocker';
+  } else if (!hasTimeCommitment) {
+    nextPriority = 'timeCommitment';
   } else {
     nextPriority = 'complete';
   }
 
-  // Extraction can lag a turn; don't stall the funnel forever if they already talked a lot.
-  if (nextPriority !== 'complete' && userMessages.length >= 14) nextPriority = 'complete';
 
   return {
+    diagnostic: {
+      specificGoal: hasSpecificGoal,
+      currentBaseline: hasCurrentBaseline,
+      primaryBlocker: hasPrimaryBlocker,
+      timeCommitment: hasTimeCommitment,
+    },
+    diagnosticComplete,
     profile,
     lifeGoals,
     pillars,
@@ -111,24 +141,17 @@ export function analyzeIntakeCoverage(
 }
 
 export function buildIntakeCoverageBlock(coverage: IntakeCoverage): string {
-  const missingProfile = [
-    !coverage.profile.location && 'where they live (city/country)',
-    !coverage.profile.work && 'what they do (work/study)',
-    !coverage.profile.relationships && 'key relationships (optional, light touch)',
-  ].filter(Boolean);
-
+  const d = coverage.diagnostic;
   return `
-INTAKE STATUS (follow this — do NOT repeat covered topics. Coverage comes from structured identity, not keyword matching):
-- User turns so far: ${coverage.userTurnCount}
-- Last thing they said (STAY ON THIS TOPIC): "${coverage.lastUserTopic || 'none yet'}"
-- Profile collected: name=${coverage.profile.name}, location=${coverage.profile.location}, work=${coverage.profile.work}, relationships=${coverage.profile.relationships}
-- Life goals discussed: ${coverage.lifeGoals ? 'YES' : 'NOT YET — ask about their LIFE vision, not yearly targets'}
-- Pillar coverage: health=${coverage.pillars.health}, smarts=${coverage.pillars.smarts}, selfCare=${coverage.pillars.selfCare}, happiness=${coverage.pillars.happiness}, spiritual=${coverage.pillars.spiritual}
-- Setbacks/struggles discussed: ${coverage.setbacks ? 'YES' : 'NOT YET'}
-- Daily time capacity: ${coverage.dailyCapacity ? 'YES' : 'NOT YET'}
-- NEXT PRIORITY THIS TURN: ${coverage.nextPriority}
-${missingProfile.length ? `- Still need profile: ${missingProfile.join(', ')}` : ''}
-${coverage.uncoveredPillars.length ? `- Pillars not yet touched: ${coverage.uncoveredPillars.join(', ')} — weave ONE in naturally when relevant` : ''}
+GOAL SCOUT DIAGNOSTIC INTAKE STATUS:
+1. Specific Goal & Scope: ${d.specificGoal ? 'COLLECTED' : 'PENDING (Ask exact outcome/result desired)'}
+2. Current Baseline: ${d.currentBaseline ? 'COLLECTED' : 'PENDING (Ask starting state / current level)'}
+3. Primary Blocker / Setback: ${d.primaryBlocker ? 'COLLECTED' : 'PENDING (Ask what holds them back / causes failure)'}
+4. Time & Resource Commitment: ${d.timeCommitment ? 'COLLECTED' : 'PENDING (Ask daily/weekly hours dedicated)'}
+
+- User messages so far: ${coverage.userTurnCount}
+- Last topic user mentioned: "${coverage.lastUserTopic || 'none yet'}"
+- NEXT QUESTION PRIORITY: ${coverage.nextPriority === 'complete' ? 'READY TO SYNTHESIZE PLAN (Output <<READY_FOR_PLAN>>)' : coverage.nextPriority}
 `.trim();
 }
 
@@ -165,6 +188,7 @@ export interface NormalizedRoadblock {
   roadblock: string;
   solution: string;
   affectedGoals?: string[];
+  isBehavioralBlocker?: boolean;
 }
 
 export interface NormalizedPlannedGoal {
@@ -183,6 +207,10 @@ export interface NormalizedPlannedGoal {
   timelinePhase1?: string;
   timelinePhase2?: string;
   timelinePhase3?: string;
+  transitionCondition?: string;
+  checkpoints?: { period: string; targetOutputMetric: string; description?: string }[];
+  microProgression?: { dayRange: string; action: string; enablesNext: string }[];
+  progressionRationale?: string;
   estimatedDaysToMastery?: number;
   linkedGoalName?: string;
   chanceOfAchievement?: number;
@@ -191,40 +219,18 @@ export interface NormalizedPlannedGoal {
   [key: string]: unknown;
 }
 
+/**
+ * Passive passthrough. The user's input goals are the ONLY foundation for the roadmap.
+ * We do not force or inject unwanted default filler goals.
+ */
 export function ensurePillarCoverage(
   plannedGoals: NormalizedPlannedGoal[],
-  coverage?: IntakeCoverage
+  _coverage?: IntakeCoverage
 ): NormalizedPlannedGoal[] {
-  const result = [...plannedGoals];
-  const present = new Set(result.map((g) => g.category));
-
-  for (const pillar of ALL_PILLARS) {
-    if (present.has(pillar)) continue;
-    const def = PILLAR_DEFAULT_GOALS[pillar];
-    const reason =
-      coverage && !coverage.pillars[pillar]
-        ? `You didn't mention ${pillar === 'selfCare' ? 'self-care' : pillar === 'smarts' ? 'learning/career' : pillar} during our chat — I added a small starter habit so all areas of your life stay balanced.`
-        : `Added to ensure balanced growth across all five life pillars.`;
-
-    result.push({
-      name: def.name,
-      description: def.description,
-      category: pillar,
-      reminderTime: def.reminderTime,
-      basePoints: 4,
-      targetFrequency: 'weekly',
-      effects: [{ category: pillar, weight: 3 }],
-      autoAdded: true,
-      autoAddedReason: reason,
-      goalScope: 'lifetime',
-      chanceOfAchievement: 75,
-      willpowerStrain: 'Low',
-    });
-  }
-  return result;
+  return plannedGoals;
 }
 
-/** Extra pillar fillers become weekly so a new plan never dumps 8 daily habits. */
+/** Caps daily habits so new users aren't overwhelmed on day 1 */
 export function capDailyPlannedGoals(goals: NormalizedPlannedGoal[], maxDaily = STRUGGLING_CAP): NormalizedPlannedGoal[] {
   const daily = goals.filter((g) => (g.targetFrequency || 'daily') !== 'weekly');
   const weekly = goals.filter((g) => g.targetFrequency === 'weekly');
@@ -234,8 +240,8 @@ export function capDailyPlannedGoals(goals: NormalizedPlannedGoal[], maxDaily = 
   const overflow = daily.slice(maxDaily).map((g) => ({
     ...g,
     targetFrequency: 'weekly' as const,
-    autoAdded: true,
-    autoAddedReason: `${g.autoAddedReason || 'Parked as weekly'} — daily list stays at ${maxDaily} so a rough week cannot dump eight habits.`.trim(),
+    autoAdded: false,
+    autoAddedReason: `Scheduled as weekly focus habit to prevent initial overload and preserve execution consistency.`,
   }));
   return [...keep, ...overflow, ...weekly];
 }
@@ -261,29 +267,25 @@ export function linkRoadblocksToGoals(
 
 export function calibrateBaselines(
   baselines: Partial<CategoryScores> | undefined,
-  coverage: IntakeCoverage
+  _coverage?: IntakeCoverage
 ): CategoryScores {
-  const defaults: CategoryScores = { health: 45, spiritual: 45, smarts: 45, selfCare: 45, happiness: 45 };
-  const result = { ...defaults, ...baselines } as CategoryScores;
-
-  for (const pillar of ALL_PILLARS) {
-    if (!coverage.pillars[pillar]) {
-      result[pillar] = Math.min(result[pillar] ?? 45, 30);
-    }
-  }
-  return result;
+  const defaults: CategoryScores = { health: 50, spiritual: 50, smarts: 50, selfCare: 50, happiness: 50 };
+  return { ...defaults, ...baselines } as CategoryScores;
 }
 
 export function extractGoalHintsFromTranscript(
   transcript: { sender: 'user' | 'ai'; text: string }[] = [],
-  identity?: UserIdentity
+  _identity?: UserIdentity
 ): { category: CategoryKey; goalType: string }[] {
   const safe = Array.isArray(transcript) ? transcript : [];
   const substantial = safe
     .filter((m) => m && m.sender === 'user')
     .map((m) => (m.text || '').trim())
-    .filter((t) => t.length >= 24);
-  return substantial.slice(0, 3).map((goalType) => ({ category: 'smarts' as CategoryKey, goalType: goalType.slice(0, 80) }));
+    .filter((t) => t.length >= 16);
+  return substantial.slice(0, 4).map((goalType) => ({
+    category: mapToPassiveCategory(undefined, goalType),
+    goalType: goalType.slice(0, 100),
+  }));
 }
 
 export function ensureRoadblockCoverage(
@@ -301,23 +303,31 @@ export function ensureRoadblockCoverage(
       (r) => r.includes(sLower) || sLower.includes(r)
     );
     if (!isAlreadyCovered) {
-      let solution = 'Establish high friction for triggers, schedule non-negotiable anchor routines, and use micro-commitments.';
+      let solution = 'Phase 1 Blocker Neutralization: Deploy low-friction micro-habits (15-30 min) to break inertia and establish daily consistency before ramping volume.';
+      let isBehavioralBlocker = false;
+
       if (/pmo|porn|adult|masturbat/i.test(sLower)) {
-        solution = 'Install digital friction (content blockers, DNS filters), remove devices from the bedroom at night, and deploy an immediate physical redirection (cold water reset or 15 pushups).';
-      } else if (/laziness|lazy|sloth|unmotivated|motivation/i.test(sLower)) {
-        solution = 'Use the 2-minute rule micro-activation: start with the absolute minimum viable step (e.g. putting on shoes) without waiting for motivation to strike.';
-      } else if (/procrastinat/i.test(sLower)) {
-        solution = "Implementation intentions ('At [time] in [place], I immediately execute step 1') combined with single-tasking 25-minute Pomodoro sprints.";
-      } else if (/phone|screen|doomscroll|social media/i.test(sLower)) {
-        solution = 'Enable grayscale display mode, set lockscreen app time limits, and keep the phone in another room during focus hours and morning routines.';
-      } else if (/inconsisten|busy|time|overwhelm/i.test(sLower)) {
-        solution = 'Anchor habits to non-negotiable daily cues (e.g., right after brushing teeth) and define a 2-minute emergency fallback version for chaotic days.';
+        solution = 'Phase 1 Blocker Neutralization: Install digital friction (DNS filters/blockers), remove devices from bedroom, and deploy immediate physical replacement (e.g. 20 pushups or cold reset).';
+        isBehavioralBlocker = true;
+      } else if (/laziness|lazy|sloth|unmotivated|motivation|discipline|low discipline/i.test(sLower)) {
+        solution = 'Phase 1 Blocker Neutralization: 2-minute rule micro-activation. Start with the lowest possible activation energy task daily (15 min maximum) to build momentum without relying on motivation.';
+        isBehavioralBlocker = true;
+      } else if (/procrastinat|avoidance|delay/i.test(sLower)) {
+        solution = "Phase 1 Blocker Neutralization: Single-task 25-minute Pomodoro blocks with clear implementation intentions ('At [time], I sit and write the first sentence').";
+        isBehavioralBlocker = true;
+      } else if (/phone|screen|doomscroll|social media|distraction|focus|lack of focus/i.test(sLower)) {
+        solution = 'Phase 1 Blocker Neutralization: Physical isolation of phone during focus sessions, grayscale mode enabled, and strict 30-minute morning distraction-free window.';
+        isBehavioralBlocker = true;
+      } else if (/inconsisten|busy|time|poor time management|overwhelm/i.test(sLower)) {
+        solution = 'Phase 1 Blocker Neutralization: Anchor the core habit directly after a fixed daily routine, and define an emergency 5-minute minimum version for chaotic days.';
+        isBehavioralBlocker = true;
       }
 
       result.push({
         roadblock: setback,
         solution,
         affectedGoals: goals.slice(0, 2).map((g) => g.name),
+        isBehavioralBlocker,
       });
       existingRoadblocksLower.add(sLower);
     }
@@ -333,22 +343,34 @@ export function normalizeBlueprint(
   const coverage = analyzeIntakeCoverage(transcript, identity);
   let plannedGoals = (Array.isArray(blueprint.plannedGoals) ? blueprint.plannedGoals : []) as NormalizedPlannedGoal[];
 
+  // NEVER drop user goals. Passively map each goal category for chart/score tracking
   plannedGoals = plannedGoals
-    .filter((g) => g && g.name && ALL_PILLARS.includes(g.category as CategoryKey))
-    .map((g) => ({
-      ...g,
-      goalScope: g.goalScope || 'lifetime',
-      targetFrequency: g.targetFrequency || 'daily',
-      basePoints: g.basePoints || 5,
-      effects: g.effects || [{ category: g.category, weight: 4 }],
-    }));
+    .filter((g) => g && (g.name || g.title))
+    .map((g) => {
+      const name = String(g.name || g.title || 'Focused Habit');
+      const cat = mapToPassiveCategory(g.category as string, name, g.description);
+      return {
+        ...g,
+        name,
+        category: cat,
+        goalScope: g.goalScope || 'lifetime',
+        targetFrequency: g.targetFrequency || 'daily',
+        basePoints: g.basePoints || 5,
+        effects: Array.isArray(g.effects) && g.effects.length
+          ? g.effects.map((effect: any) => ({
+              category: mapToPassiveCategory(effect?.category, name, g.description),
+              weight: Number(effect?.weight) || 4,
+            }))
+          : [{ category: cat, weight: 4 }],
+      };
+    });
 
-  plannedGoals = ensurePillarCoverage(plannedGoals, coverage);
   plannedGoals = capDailyPlannedGoals(plannedGoals, STRUGGLING_CAP);
 
   const allSetbacks = Array.from(
     new Set([
       ...((Array.isArray(blueprint.extractedSetbacks) ? blueprint.extractedSetbacks : []) as string[]),
+      ...(identity?.primaryBlockers || []),
       ...(identity?.setbacks || []),
     ])
   );
@@ -366,11 +388,6 @@ export function normalizeBlueprint(
     coverage
   );
 
-  const autoAddedNotes = plannedGoals
-    .filter((g) => g.autoAdded)
-    .map((g) => `${g.name}: ${g.autoAddedReason}`)
-    .join(' ');
-
   let lifetimeMegaGoals = (Array.isArray(blueprint.lifetimeMegaGoals) ? blueprint.lifetimeMegaGoals : []) as {
     title: string;
     description?: string;
@@ -385,27 +402,40 @@ export function normalizeBlueprint(
         lifetimeMegaGoals.push({
           title: lg.trim(),
           description: 'Major lifetime vision target identified from Goal Scout',
-          timelineEstimate: 'Long-term arc',
-          category: 'life',
+          timelineEstimate: 'Multi-Year Master Target',
+          category: mapToPassiveCategory(undefined, lg),
         });
         existingTitles.add(lg.toLowerCase());
       }
     }
   }
 
+  // Diagnostic summary
+  const diagnosticSummary = {
+    specificGoal: identity?.lifeGoals?.[0] || String(blueprint.masterVision || '').slice(0, 120),
+    currentBaseline: identity?.currentBaseline || 'Initial baseline',
+    primaryBlockers: allSetbacks.slice(0, 4),
+    timeCommitment: identity?.dailyCapacity || 'Standard daily focus session',
+  };
+
   return {
     ...blueprint,
+    masterVision: blueprint.masterVision || `Achieve ${diagnosticSummary.specificGoal} with structured daily execution and progressive mastery.`,
+    executiveSummary: blueprint.executiveSummary || blueprint.masterVision || `Strategic roadmap targeting ${diagnosticSummary.specificGoal} by neutralizing initial friction, building core capability, and scaling consistent execution.`,
     plannedGoals,
     roadblocks,
     lifetimeMegaGoals,
+    macroPhases: blueprint.macroPhases,
+    checkpoints: blueprint.checkpoints,
+    microProgression: blueprint.microProgression,
+    diagnosticSummary,
     extractedSetbacks: allSetbacks.length ? allSetbacks : blueprint.extractedSetbacks,
     categoryBaselines,
-    pillarAutoFillNotes: autoAddedNotes || undefined,
     intakeSummary: {
+      diagnosticComplete: coverage.diagnosticComplete,
       profileComplete: coverage.profile.name && (coverage.profile.location || coverage.profile.work),
-      lifeGoalsDiscussed: coverage.lifeGoals,
-      setbacksDiscussed: coverage.setbacks,
-      pillarsCovered: coverage.pillars,
+      lifeGoalsDiscussed: coverage.diagnostic.specificGoal,
+      setbacksDiscussed: coverage.diagnostic.primaryBlocker,
     },
   };
 }

@@ -92,6 +92,10 @@ export interface AIPlannedGoal {
   timelinePhase1: string;
   timelinePhase2: string;
   timelinePhase3: string;
+  transitionCondition?: string;
+  checkpoints?: { period: string; targetOutputMetric: string; description?: string }[];
+  microProgression?: { dayRange: string; action: string; enablesNext: string }[];
+  progressionRationale?: string;
   linkedGoalName?: string; // habit stack — name of goal this feeds into
   estimatedDaysToMastery?: number;
   chanceOfAchievement?: number;
@@ -126,6 +130,7 @@ export interface LifetimeMegaGoal {
 export interface MasterBlueprint {
   userName: string;
   masterVision: string;
+  executiveSummary?: string;
   overallWillpowerIndex?: number;
   plannedGoals: AIPlannedGoal[];
   roadblocks: BlueprintRoadblock[];
@@ -136,11 +141,21 @@ export interface MasterBlueprint {
   userProfileSummary?: string;
   extractedSetbacks?: string[];
   lifetimeMegaGoals?: LifetimeMegaGoal[];
+  macroPhases?: { phaseNumber: number; title: string; timeline: string; transitionCondition: string; description: string }[];
+  checkpoints?: { period: string; targetOutputMetric: string; description: string }[];
+  microProgression?: { dayRange: string; focus: string; dailyActions: string[]; progressionMechanism: string }[];
+  diagnosticSummary?: {
+    specificGoal?: string;
+    currentBaseline?: string;
+    primaryBlockers?: string[];
+    timeCommitment?: string;
+  };
   intakeSummary?: {
     profileComplete?: boolean;
     lifeGoalsDiscussed?: boolean;
     setbacksDiscussed?: boolean;
-    pillarsCovered?: Partial<CategoryScores>;
+    diagnosticComplete?: boolean;
+    pillarsCovered?: Partial<Record<CategoryKey, boolean>>;
   };
   createdAt: string;
   status?: 'building' | 'ready' | 'failed' | 'pending_review';
@@ -190,8 +205,10 @@ export interface UserIdentity {
   work?: string;
   relationships?: string;
   lifeGoals?: string[];
+  currentBaseline?: string;
   pillarNotes?: Partial<Record<CategoryKey, string>>;
   setbacks?: string[];
+  primaryBlockers?: string[];
   dailyCapacity?: string;
   preferredTime?: string;
   extractedAt?: string;

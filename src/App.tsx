@@ -75,6 +75,8 @@ import { ensureNexusPersona } from './utils/nexusPersona';
 import { rewriteBlueprintFromCompletions, shouldRewriteBlueprint } from './utils/weeklyBlueprint';
 import { mergeIdentity } from './utils/userIdentity';
 import { applyDailyCapToGoals, capFromProfile } from './utils/dailyCap';
+import { mapToPassiveCategory } from './utils/blueprintNormalizer';
+import { ensureTasksForGoals } from './utils/goalPathways';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
@@ -174,6 +176,16 @@ export default function App() {
     saveUserConfig(updated);
   }, [dailyLogs, goals, userConfig.onboarded, userConfig.lastBlueprintRewriteAt, userConfig.masterBlueprint]);
 
+  // Ensure every active goal has scheduled tasks for today & tomorrow
+  useEffect(() => {
+    if (!goals.length) return;
+    const synced = ensureTasksForGoals(goals, plannedTasks, todayStr);
+    if (synced.length !== plannedTasks.length) {
+      setPlannedTasks(synced);
+      savePlannedTasks(synced);
+    }
+  }, [goals, todayStr, plannedTasks.length]);
+
   // Automatically prompt for push notifications & location permissions on startup / onboarding
   useEffect(() => {
     if (!userConfig.onboarded) return;
@@ -238,7 +250,7 @@ export default function App() {
     // Build new Goal objects from AI plan (merged into existing goals)
     const newGoals: Goal[] = aiGoals.map((g: any) => {
       const id = `goal-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const cat = g.category || 'health';
+      const cat = mapToPassiveCategory(g.category, String(g.title || g.name || ''), String(g.targetDescription || g.description || ''));
       const adaptive = buildAdaptiveTimeline(
         String(g.title || 'Untitled Goal'),
         String(g.targetDescription || ''),
@@ -611,16 +623,16 @@ export default function App() {
           id: ng.id || `goal-added-${Date.now()}-${idx}`,
           name: ng.name!,
           description: ng.description || '',
-          category: ng.category || 'smarts',
+          category: mapToPassiveCategory(ng.category, ng.name || '', ng.description || ''),
           frequency: ng.frequency || 'daily',
           priority: ng.priority || 'active',
           proofPreference: ng.proofPreference || 'auto',
           reminderTime: ng.reminderTime || '08:30',
           reminderEnabled: ng.reminderEnabled ?? true,
           basePoints: ng.basePoints || 5,
-          effects: ng.effects || [{ category: ng.category || 'smarts', weight: 4 }],
+          effects: ng.effects || [{ category: mapToPassiveCategory(ng.category, ng.name || '', ng.description || ''), weight: 4 }],
           isLifePathAligned: ng.isLifePathAligned ?? true,
-          isCognitiveTraining: ng.isCognitiveTraining ?? (ng.category === 'smarts'),
+          isCognitiveTraining: ng.isCognitiveTraining ?? (mapToPassiveCategory(ng.category, ng.name || '', ng.description || '') === 'smarts'),
           createdAt: ng.createdAt || new Date().toISOString(),
         }));
 
@@ -1012,6 +1024,8 @@ export default function App() {
             journals={journals}
             todayStr={todayStr}
             userConfig={userConfig}
+            plannedTasks={plannedTasks}
+            milestones={milestones}
             onToggleGoal={handleToggleGoal}
             onOpenProofModal={(g) => handleOpenProofModal(g)}
             onOpenAddGoal={() => setCurrentTab('goals')}
@@ -1068,6 +1082,8 @@ export default function App() {
           <GoalsManager
             goals={goals}
             userConfig={userConfig}
+            dailyLogs={dailyLogs}
+            todayStr={todayStr}
             onSaveGoal={handleSaveGoal}
             onDeleteGoal={handleDeleteGoal}
             onAddPresetGoals={handleAddPresetGoals}

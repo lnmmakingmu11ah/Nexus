@@ -24,6 +24,7 @@ export function mergeIdentity(existing: UserIdentity | undefined, incoming: User
   const pillarNotes = { ...(a.pillarNotes || {}), ...(b.pillarNotes || {}) };
   const lifeGoals = [...new Set([...(a.lifeGoals || []), ...(b.lifeGoals || [])].map((g) => g.trim()).filter(Boolean))].slice(0, 8);
   const setbacks = [...new Set([...(a.setbacks || []), ...(b.setbacks || [])].map((g) => g.trim()).filter(Boolean))].slice(0, 8);
+  const primaryBlockers = [...new Set([...(a.primaryBlockers || []), ...(b.primaryBlockers || [])].map((g) => g.trim()).filter(Boolean))].slice(0, 8);
 
   return {
     name: clean(b.name) || clean(a.name),
@@ -32,8 +33,10 @@ export function mergeIdentity(existing: UserIdentity | undefined, incoming: User
     work: clean(b.work) || clean(a.work),
     relationships: clean(b.relationships) || clean(a.relationships),
     lifeGoals,
+    currentBaseline: clean(b.currentBaseline) || clean(a.currentBaseline),
     pillarNotes,
     setbacks,
+    primaryBlockers,
     dailyCapacity: clean(b.dailyCapacity) || clean(a.dailyCapacity),
     preferredTime: clean(b.preferredTime) || clean(a.preferredTime),
     extractedAt: b.extractedAt || a.extractedAt || new Date().toISOString(),
@@ -79,6 +82,24 @@ export function heuristicIdentityFromTranscript(
   }
   draft.lifeGoals = lifeGoals.slice(0, 8);
 
+  const baselineM = userText.match(/(?:starting from|currently at|right now i'?m|baseline is|i currently have|i have zero|starting with|starting scratch)\s+([^\n.]{4,90})/i);
+  if (baselineM) draft.currentBaseline = clean(baselineM[0]);
+
+  const blockers: string[] = [];
+  const blockerRe = /(?:holding me back is|my blocker is|struggle with|problem is|stuck on|bad habit of|trouble with|fighting)\s+([^\n.]{4,80})/gi;
+  let bm: RegExpExecArray | null;
+  while ((bm = blockerRe.exec(userText)) !== null) {
+    const b = clean(bm[0]);
+    if (b) blockers.push(b);
+  }
+  if (/laziness|lazy|procrastinat|lack of focus|low discipline|phone addiction|distraction/i.test(userText)) {
+    const match = userText.match(/\b(laziness|lazy|procrastination|procrastinating|lack of focus|low discipline|phone addiction|distractions?)\b/i);
+    if (match && !blockers.some((b) => b.toLowerCase().includes(match[1].toLowerCase()))) {
+      blockers.push(match[1]);
+    }
+  }
+  draft.primaryBlockers = blockers.slice(0, 8);
+
   const setbacks: string[] = [];
   const setRe =
     /(?:i struggle with|i keep|i always|i can'?t|i cannot|what stops me is|i used to)\s+([^\n.]{6,90})/gi;
@@ -89,8 +110,8 @@ export function heuristicIdentityFromTranscript(
   }
   draft.setbacks = setbacks.slice(0, 8);
 
-  const capM = userText.match(/(\d+)\s*(min|minute|hour)s?\s*(?:a|per)\s*day/i);
-  if (capM) draft.dailyCapacity = `${capM[1]} ${capM[2]}${Number(capM[1]) === 1 ? '' : 's'} a day`;
+  const capM = userText.match(/(\d+(?:\.\d+)?)\s*(min|minute|hour|hr)s?\s*(?:a|per|\/)\s*(?:day|week)/i);
+  if (capM) draft.dailyCapacity = `${capM[1]} ${capM[2]}s commitment`;
 
   const timeM = userText.match(/\b(morning|night|evening|afternoon)s?\b/i);
   if (timeM && /\b(prefer|better|usually|work best|time)\b/i.test(userText)) {
@@ -114,7 +135,9 @@ export function formatIdentityForPrompt(identity?: UserIdentity): string {
     identity.work && `Work/study: ${identity.work}`,
     identity.relationships && `Relationships: ${identity.relationships}`,
     identity.lifeGoals?.length && `Life goals: ${identity.lifeGoals.join('; ')}`,
+    identity.currentBaseline && `Current baseline: ${identity.currentBaseline}`,
     identity.setbacks?.length && `Setbacks: ${identity.setbacks.join('; ')}`,
+    identity.primaryBlockers?.length && `Primary blockers: ${identity.primaryBlockers.join('; ')}`,
     identity.dailyCapacity && `Daily capacity: ${identity.dailyCapacity}`,
     identity.preferredTime && `Preferred time: ${identity.preferredTime}`,
     identity.pillarNotes &&
@@ -139,6 +162,11 @@ export function normalizeExtractedIdentity(raw: any): UserIdentity {
   const setbacks = Array.isArray(raw?.setbacks)
     ? raw.setbacks.map((g: any) => String(g).trim()).filter(Boolean).slice(0, 8)
     : [];
+  const primaryBlockers = Array.isArray(raw?.primaryBlockers)
+    ? raw.primaryBlockers.map((g: any) => String(g).trim()).filter(Boolean).slice(0, 8)
+    : raw?.primaryBlocker
+      ? [String(raw.primaryBlocker).trim()].filter(Boolean)
+      : [];
 
   return {
     name: clean(raw?.name),
@@ -147,8 +175,10 @@ export function normalizeExtractedIdentity(raw: any): UserIdentity {
     work: clean(raw?.work),
     relationships: clean(raw?.relationships),
     lifeGoals,
+    currentBaseline: clean(raw?.currentBaseline),
     pillarNotes,
     setbacks,
+    primaryBlockers,
     dailyCapacity: clean(raw?.dailyCapacity),
     preferredTime: clean(raw?.preferredTime),
     extractedAt: new Date().toISOString(),

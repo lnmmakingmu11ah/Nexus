@@ -43,24 +43,19 @@ export const PlanReviewModal: React.FC<PlanReviewModalProps> = ({ blueprint, onC
             <div>
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-400" />
-                Review your lifetime plan
+                Review your lifetime roadmap
               </h2>
               <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                Keep, rename, or drop goals. NEXUS-added pillar habits are marked — remove them if they don't fit.
+                Review your goals. Category tags are passive monitoring metrics — your ambition drives every milestone.
               </p>
             </div>
             <button type="button" onClick={onCancel} className="text-zinc-500 hover:text-white p-1">
               <X className="w-4 h-4" />
             </button>
           </div>
-          {blueprint.masterVision && (
+          {(blueprint.executiveSummary || blueprint.masterVision) && (
             <p className="mt-3 text-xs text-amber-200/90 bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 leading-relaxed">
-              {blueprint.masterVision}
-            </p>
-          )}
-          {autoCount > 0 && (
-            <p className="mt-2 text-[11px] text-violet-300">
-              {autoCount} auto-added for pillar balance. You can delete them.
+              {blueprint.executiveSummary || blueprint.masterVision}
             </p>
           )}
         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import {
   ResponsiveContainer,
@@ -41,6 +41,7 @@ import {
   Target,
   RefreshCw,
   X,
+  Compass,
 } from 'lucide-react';
 import { loadCustomFolders, saveCustomFolders } from '../utils/storage';
 import { selectDailyFocusGoals, capFromProfile } from '../utils/dailyCap';
@@ -52,6 +53,8 @@ import {
   DailyGoalLog,
   Goal,
   UserConfig,
+  PlannedTask,
+  Milestone,
 } from '../types';
 import { ScoreCalculationResult, calculateGoalBestStreak } from '../utils/scoring';
 import { MonthlyCalendar } from './MonthlyCalendar';
@@ -59,6 +62,8 @@ import { DailyIntention } from './DailyIntention';
 import { evaluateBadges } from '../utils/badges';
 import { calculateNexusPoints } from '../utils/gamification';
 import { DailyJournal } from '../types';
+import { GoalPathwayModal } from './GoalPathwayModal';
+import { getGoalPathway } from '../utils/goalPathways';
 
 interface DashboardProps {
   scoreData: ScoreCalculationResult;
@@ -67,6 +72,8 @@ interface DashboardProps {
   journals?: DailyJournal[];
   todayStr: string;
   userConfig: UserConfig;
+  plannedTasks?: PlannedTask[];
+  milestones?: Milestone[];
   onToggleGoal: (goalId: string) => void;
   onOpenProofModal: (goal: Goal) => void;
   onOpenAddGoal: () => void;
@@ -83,6 +90,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   journals = [],
   todayStr,
   userConfig,
+  plannedTasks = [],
+  milestones = [],
   onToggleGoal,
   onOpenProofModal,
   onOpenAddGoal,
@@ -91,6 +100,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onUpdateUserConfig,
   onNavigateTab,
 }) => {
+  const [activePathwayGoal, setActivePathwayGoal] = useState<Goal | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterFolder, setFilterFolder] = useState<string>('all');
   const [filterStreak, setFilterStreak] = useState<'all' | 'over5' | 'best'>('all');
@@ -160,6 +170,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
       userConfig?.absenceThresholdDays || 3
     );
   });
+
+  const tomorrowTaskMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    activeGoals.forEach((g) => {
+      try {
+        const p = getGoalPathway(g, plannedTasks, milestones, dailyLogs, userConfig, todayStr);
+        map[g.id] = p.tomorrowTask.title;
+      } catch {
+        map[g.id] = 'Checkpoint practice session';
+      }
+    });
+    return map;
+  }, [activeGoals, plannedTasks, milestones, dailyLogs, userConfig, todayStr]);
 
   const over5StreakGoals = activeGoals.filter(
     (g) => (scoreData.streakData[g.id]?.streak || 0) > 5
@@ -868,14 +891,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       return (
                         <div
                           key={goal.id}
-                          className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between relative overflow-hidden ${cardStyle}`}
+                          onClick={() => setActivePathwayGoal(goal)}
+                          className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-amber-500/50 hover:shadow-lg ${cardStyle}`}
                         >
                           <div>
                             <div className="flex items-start justify-between space-x-3 mb-1.5">
                               <div className="flex items-start space-x-2.5">
                                 <button
-                                  onClick={() => onToggleGoal(goal.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleGoal(goal.id);
+                                  }}
                                   className="mt-0.5 text-zinc-400 hover:text-emerald-400 transition-colors focus:outline-none cursor-pointer"
+                                  title="Check off today's habit"
                                 >
                                   {isCompleted ? (
                                     <CheckCircle2 className="w-4 h-4 text-emerald-400 fill-emerald-500/20" />
@@ -901,6 +929,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 <Flame className="w-3 h-3 fill-amber-400/30" />
                                 <span>{streakInfo.streak}d</span>
                               </div>
+                            </div>
+
+                            {/* Tomorrow's Step Quick Preview Banner */}
+                            <div className="mt-2 p-1.5 rounded-lg bg-zinc-950/80 border border-amber-500/25 flex items-center justify-between gap-1.5 hover:bg-amber-500/10 transition-colors">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-[8px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1 py-0.2 rounded border border-amber-500/30 shrink-0">
+                                  Tomorrow
+                                </span>
+                                <span className="text-[10px] text-zinc-300 font-medium truncate">
+                                  {tomorrowTaskMap[goal.id] || 'Deliberate practice step'}
+                                </span>
+                              </div>
+                              <span className="text-[9px] font-bold text-amber-300 flex items-center gap-0.5 shrink-0">
+                                Plan &rarr;
+                              </span>
                             </div>
                           </div>
 
@@ -940,14 +983,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 </span>
                               )}
                             </div>
-                            <button
-                              onClick={() => onOpenProofModal(goal)}
-                              title="Attach proof or improve verification confidence"
-                              className="p-1 text-zinc-400 hover:text-emerald-400 transition-colors flex items-center gap-1 text-[10px]"
-                            >
-                              <Camera className="w-3 h-3" />
-                              <span>Proof</span>
-                            </button>
+                            <div className="flex items-center space-x-1.5">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActivePathwayGoal(goal);
+                                }}
+                                title="View roadmap: today's action, tomorrow's expected task, weekly & monthly progress"
+                                className="px-2 py-0.5 text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-semibold"
+                              >
+                                <Compass className="w-2.5 h-2.5 text-amber-400" />
+                                <span>AI Path</span>
+                              </button>
+                              <button
+                                onClick={() => onOpenProofModal(goal)}
+                                title="Attach proof or improve verification confidence"
+                                className="p-1 text-zinc-400 hover:text-emerald-400 transition-colors flex items-center gap-1 text-[10px]"
+                              >
+                                <Camera className="w-3 h-3" />
+                                <span>Proof</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -986,7 +1042,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
               return (
                 <div
                   key={goal.id}
-                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between relative overflow-hidden ${cardStyle}`}
+                  onClick={() => setActivePathwayGoal(goal)}
+                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-amber-500/50 hover:shadow-xl ${cardStyle}`}
                 >
                   {/* Subtle Top Accent Ribbon for Lifetime Best or Hot (>5) Streaks */}
                   {isLifetimeBest && (
@@ -1022,8 +1079,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div className="flex items-start justify-between space-x-3 mb-2">
                       <div className="flex items-start space-x-3">
                         <button
-                          onClick={() => onToggleGoal(goal.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleGoal(goal.id);
+                          }}
                           className="mt-0.5 text-zinc-400 hover:text-emerald-400 transition-colors focus:outline-none cursor-pointer"
+                          title="Check off today's habit"
                         >
                           {isCompleted ? (
                             <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-500/20" />
@@ -1105,6 +1166,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <p className="text-[11px] text-zinc-400 font-light mt-0.5 line-clamp-2">
                             {goal.description}
                           </p>
+
+                          {/* Tomorrow's Action Quick Preview Banner */}
+                          <div className="mt-2.5 p-2 rounded-lg bg-zinc-950/80 border border-amber-500/25 flex items-center justify-between gap-2 hover:bg-amber-500/10 transition-colors">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[9px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
+                                Tomorrow’s Step
+                              </span>
+                              <span className="text-[11px] text-zinc-300 font-medium truncate">
+                                {tomorrowTaskMap[goal.id] || 'Deliberate practice & checkpoint'}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-bold text-amber-300 flex items-center gap-0.5 shrink-0">
+                              Roadmap &rarr;
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -1184,15 +1260,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         ))}
                       </div>
 
-                      {/* Proof Media Button */}
-                      <button
-                        onClick={() => onOpenProofModal(goal)}
-                        title="Attach proof or improve verification confidence"
-                        className="p-1.5 text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 rounded-lg transition-colors flex items-center space-x-1 text-[11px]"
-                      >
-                        <Camera className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Attach Proof</span>
-                      </button>
+                      <div className="flex items-center space-x-1.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActivePathwayGoal(goal);
+                          }}
+                          title="View roadmap: today's action, tomorrow's expected task, weekly & monthly progress"
+                          className="px-2.5 py-1 text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold"
+                        >
+                          <Compass className="w-3.5 h-3.5 text-amber-400" />
+                          <span>AI Path</span>
+                        </button>
+                        <button
+                          onClick={() => onOpenProofModal(goal)}
+                          title="Attach proof or improve verification confidence"
+                          className="p-1.5 text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 rounded-lg transition-colors flex items-center space-x-1 text-[11px]"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Attach Proof</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1251,6 +1339,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </form>
         </div>
+      )}
+
+      {/* Goal Execution Pathway & Horizon Modal */}
+      {activePathwayGoal && (
+        <GoalPathwayModal
+          goal={activePathwayGoal}
+          plannedTasks={plannedTasks}
+          milestones={milestones}
+          dailyLogs={dailyLogs}
+          userConfig={userConfig}
+          todayStr={todayStr}
+          onClose={() => setActivePathwayGoal(null)}
+          onToggleGoal={onToggleGoal}
+        />
       )}
     </div>
   );

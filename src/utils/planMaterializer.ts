@@ -11,7 +11,7 @@ import {
   PlannedTask,
   UserConfig,
 } from '../types';
-import { matchGoalByName } from './blueprintNormalizer';
+import { matchGoalByName, mapToPassiveCategory } from './blueprintNormalizer';
 import { buildAdaptiveTimeline, buildTimelineMilestones } from './timelinePlanner';
 import { getInitialTaskParams, computeEngagementTier } from './zeroToHero';
 import { applyDailyCapToGoals, capFromProfile } from './dailyCap';
@@ -33,7 +33,7 @@ export function materializeBlueprintPlan(
 
   const newGoals: Goal[] = selectedGoals.map((pg, idx) => {
     const id = `goal-ai-${ts}-${idx}`;
-    const cat = pg.category || 'smarts';
+    const cat = mapToPassiveCategory(pg.category, pg.name, pg.description);
     const adaptive = buildAdaptiveTimeline(
       String(pg.name || `Goal ${idx + 1}`),
       String(pg.description || ''),
@@ -57,7 +57,12 @@ export function materializeBlueprintPlan(
       priority: 'active' as const,
       proofPreference: 'auto' as const,
       basePoints: taskParams.basePoints,
-      effects: pg.effects || [{ category: cat, weight: 4 }],
+      effects: Array.isArray(pg.effects) && pg.effects.length
+        ? pg.effects.map((effect) => ({
+            category: mapToPassiveCategory(effect.category, pg.name, pg.description),
+            weight: Number(effect.weight) || 4,
+          }))
+        : [{ category: cat, weight: 4 }],
       isLifePathAligned: true,
       isCognitiveTraining: cat === 'smarts',
       createdAt: new Date().toISOString(),

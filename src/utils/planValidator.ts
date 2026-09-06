@@ -5,6 +5,7 @@
  */
 
 import { PlannedGoalDraft, Milestone, PlannedTask, CategoryKey } from '../types';
+import { mapToPassiveCategory } from './blueprintNormalizer';
 
 const VALID_CATEGORIES: CategoryKey[] = ['health', 'smarts', 'spiritual', 'selfCare', 'happiness'];
 const MIN_TIMELINE_DAYS = 7;
@@ -38,8 +39,9 @@ export function validateGoalDraft(draft: unknown): ValidationResult {
 
   if (!d.title || typeof d.title !== 'string' || sanitize(d.title).length < 2)
     errors.push('Goal title is required (min 2 chars)');
-  if (!d.category || !VALID_CATEGORIES.includes(d.category as CategoryKey))
-    errors.push(`Invalid category "${d.category}". Must be: ${VALID_CATEGORIES.join(', ')}`);
+  if (!d.category || !VALID_CATEGORIES.includes(d.category as CategoryKey)) {
+    d.category = mapToPassiveCategory(d.category as string, String(d.title || ''), String(d.targetDescription || ''));
+  }
 
   if (d.timelineRange) {
     const tr = d.timelineRange as Record<string, unknown>;

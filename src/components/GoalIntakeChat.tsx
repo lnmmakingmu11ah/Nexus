@@ -25,7 +25,7 @@ const hardnessLabels: Record<number, string> = { 1: 'trivial', 2: 'easy', 3: 'mo
 
 export const GoalIntakeChat: React.FC<GoalIntakeChatProps> = ({ userConfig, onPlanReady, onUpdateIntakeState }) => {
   const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string }[]>([
-    { sender: 'ai', text: `yo ${userConfig.userName || 'fam'}! 👋 lets figure out what u actually wanna build. just talk to me — what's the main thing on ur mind rn, like what do u wanna change or achieve?` },
+    { sender: 'ai', text: `yo ${userConfig.userName || 'fam'}! 👋 lets map out what u actually want to achieve. what's the exact result or ambition u want to build? (e.g. "become a millionaire", "build a SaaS app", "lose 20 lbs")` },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);

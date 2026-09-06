@@ -23,6 +23,9 @@ import {
   X,
   Check,
   Crown,
+  ArrowRight,
+  ShieldCheck,
+  Milestone as MilestoneIcon,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { UserConfig, AIChatMessage, Goal, DailyGoalLog, DailyJournal, CATEGORY_NAMES, CATEGORY_COLORS, LifetimeMegaGoal, CategoryKey } from '../types';
@@ -35,6 +38,7 @@ import { mergeMemory } from '../utils/aiMemory';
 import { buildAdaptiveTimeline } from '../utils/timelinePlanner';
 import { ensureNexusPersona } from '../utils/nexusPersona';
 import { mergeIdentity } from '../utils/userIdentity';
+import { mapToPassiveCategory } from '../utils/blueprintNormalizer';
 
 interface AICoachViewProps {
   userConfig: UserConfig;
@@ -77,12 +81,12 @@ function parseAndExecuteAction(
           onAddGoals([{
             name: parsed.name,
             description: parsed.description || 'Created via NEXUS AI chat',
-            category: parsed.category || 'smarts',
+            category: mapToPassiveCategory(parsed.category, parsed.name || '', parsed.description || ''),
             frequency: parsed.frequency || 'daily',
             reminderTime: parsed.reminderTime || '08:30',
             reminderEnabled: true,
             basePoints: 5,
-            effects: [{ category: parsed.category || 'smarts', weight: 4 }],
+            effects: [{ category: mapToPassiveCategory(parsed.category, parsed.name || '', parsed.description || ''), weight: 4 }],
             isLifePathAligned: true,
           }]);
           actionTag = `⚡ Added Goal: "${parsed.name}"`;
@@ -697,7 +701,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
               </span>
             </div>
             <p className="text-xs sm:text-sm text-zinc-400 font-light mt-1 max-w-2xl">
-              Daily chat + your saved lifetime blueprint. Goal Scout maps who you are, your life goals, and setbacks.
+Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blockers, and available time; category tags only monitor progress.
             </p>
           </div>
         </div>
@@ -765,16 +769,56 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
             </div>
           )}
 
-          {/* Master Vision & Overview */}
+          {/* Master Vision & Executive Strategy */}
           {blueprint && (
-            <div className="bg-gradient-to-br from-zinc-950/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-3">
+            <div className="bg-gradient-to-br from-zinc-950/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
               <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
                 <Sparkles className="w-4 h-4 animate-pulse" />
-                <span>AI Analyzed Core Vision</span>
+                <span>AI Analyzed Core Vision & Executive Strategy</span>
               </div>
               <h3 className="text-base font-bold text-white leading-snug">
                 {blueprint.masterVision}
               </h3>
+              {blueprint.executiveSummary && (
+                <div className="bg-amber-500/10 border border-amber-500/25 p-3.5 rounded-xl space-y-1">
+                  <span className="text-[10px] font-mono font-bold text-amber-300 uppercase tracking-wider">
+                    Executive Strategy Roadmap
+                  </span>
+                  <p className="text-xs text-amber-100/90 leading-relaxed">
+                    {blueprint.executiveSummary}
+                  </p>
+                </div>
+              )}
+
+              {/* Diagnostic Profile Summary */}
+              {(blueprint.diagnosticSummary?.currentBaseline ||
+                blueprint.diagnosticSummary?.primaryBlockers?.length ||
+                userConfig.userIdentity?.currentBaseline ||
+                userConfig.userIdentity?.primaryBlockers?.length) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 border-t border-zinc-800/80 pt-3">
+                  {(blueprint.diagnosticSummary?.currentBaseline || userConfig.userIdentity?.currentBaseline) && (
+                    <div className="bg-zinc-900/70 border border-zinc-800 p-2.5 rounded-xl">
+                      <span className="text-[10px] font-mono uppercase text-zinc-500 font-semibold block">
+                        Starting Baseline
+                      </span>
+                      <p className="text-xs text-zinc-300 mt-0.5">
+                        {blueprint.diagnosticSummary?.currentBaseline || userConfig.userIdentity?.currentBaseline}
+                      </p>
+                    </div>
+                  )}
+                  {(blueprint.diagnosticSummary?.primaryBlockers?.length || userConfig.userIdentity?.primaryBlockers?.length) && (
+                    <div className="bg-zinc-900/70 border border-zinc-800 p-2.5 rounded-xl">
+                      <span className="text-[10px] font-mono uppercase text-rose-400 font-semibold block">
+                        Neutralizing Primary Blockers
+                      </span>
+                      <p className="text-xs text-rose-200/90 mt-0.5">
+                        {(blueprint.diagnosticSummary?.primaryBlockers || userConfig.userIdentity?.primaryBlockers || []).join(' · ')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {blueprint.userProfileSummary && (
                 <p className="text-xs text-zinc-400 font-light leading-relaxed border-t border-zinc-800/80 pt-3">
                   <span className="text-zinc-500 font-mono text-[10px] uppercase">About you: </span>
@@ -791,14 +835,155 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
                       : 'building — ramping difficulty with your consistency'}
                 </p>
               )}
-              {(blueprint.extractedSetbacks?.length || 0) > 0 && (
-                <div className="border-t border-zinc-800/80 pt-3">
-                  <span className="text-zinc-500 font-mono text-[10px] uppercase">Setbacks NEXUS mapped</span>
-                  <p className="text-xs text-rose-200/90 mt-1 leading-relaxed">
-                    {blueprint.extractedSetbacks!.join(' · ')}
-                  </p>
+            </div>
+          )}
+
+          {/* Macro-View: Multi-Year / Phase Breakdown */}
+          {blueprint?.macroPhases && blueprint.macroPhases.length > 0 && (
+            <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+              <div>
+                <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                  <MilestoneIcon className="w-4 h-4 text-amber-400" />
+                  <span>Macro-View: Multi-Stage Phase Breakdown</span>
                 </div>
-              )}
+                <p className="text-xs text-zinc-400 font-light mt-0.5">
+                  Sequential phases across stages with concrete milestone conditions required to transition to next phase.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {blueprint.macroPhases.map((phase: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="bg-zinc-900/90 border border-amber-500/20 hover:border-amber-500/40 p-4 rounded-xl space-y-3 flex flex-col justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold text-amber-400 uppercase bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-md">
+                          Phase {phase.phaseNumber || idx + 1}
+                        </span>
+                        <span className="text-[10px] font-mono text-zinc-400">
+                          {phase.timeline || `Stage ${idx + 1}`}
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-bold text-white tracking-tight">{phase.title}</h4>
+                      <p className="text-xs text-zinc-300 font-light leading-relaxed">
+                        {phase.description}
+                      </p>
+                    </div>
+
+                    {phase.transitionCondition && (
+                      <div className="bg-emerald-500/10 border border-emerald-500/25 p-2.5 rounded-lg space-y-1">
+                        <span className="text-[9px] font-mono font-bold uppercase text-emerald-400 flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" />
+                          Transition Condition
+                        </span>
+                        <p className="text-[11px] text-emerald-200/90 leading-tight">
+                          {phase.transitionCondition}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Medium-View: Checkpoint Schedule */}
+          {blueprint?.checkpoints && blueprint.checkpoints.length > 0 && (
+            <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+              <div>
+                <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                  <Target className="w-4 h-4 text-amber-400" />
+                  <span>Medium-View: Checkpoint Schedule & Target Output Metrics</span>
+                </div>
+                <p className="text-xs text-zinc-400 font-light mt-0.5">
+                  Clear output milestones per timeframe so tomorrow is clearly differentiated from today.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {blueprint.checkpoints.map((cp: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="bg-zinc-900/80 border border-zinc-800 p-4 rounded-xl space-y-2.5 flex flex-col justify-between"
+                  >
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                        {cp.period}
+                      </span>
+                      <h4 className="text-xs font-semibold text-zinc-200 mt-1">{cp.description}</h4>
+                    </div>
+
+                    <div className="bg-zinc-950 p-2.5 rounded-lg border border-zinc-800 space-y-1">
+                      <span className="text-[9px] font-mono uppercase text-zinc-500 font-bold">
+                        Target Output Metric
+                      </span>
+                      <p className="text-xs font-semibold text-amber-300 leading-snug">
+                        {cp.targetOutputMetric}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Micro-View: Daily & Weekly Action Progression */}
+          {blueprint?.microProgression && blueprint.microProgression.length > 0 && (
+            <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+              <div>
+                <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                  <TrendingUp className="w-4 h-4 text-amber-400" />
+                  <span>Micro-View: Daily & Weekly Action Progression</span>
+                </div>
+                <p className="text-xs text-zinc-400 font-light mt-0.5">
+                  Evolving daily tasks that build on one another over time (Task A enabling Task B).
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {blueprint.microProgression.map((prog: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className="bg-zinc-900/90 border border-zinc-800 p-4 rounded-xl space-y-3 flex flex-col justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                          {prog.dayRange}
+                        </span>
+                        <span className="text-[10px] font-mono text-zinc-400">{prog.focus}</span>
+                      </div>
+
+                      <div className="space-y-1.5 pt-1">
+                        <span className="text-[9px] font-mono uppercase text-zinc-500 font-bold">
+                          Daily Action Protocol
+                        </span>
+                        <ul className="space-y-1 text-xs text-zinc-300">
+                          {(prog.dailyActions || []).map((action: string, actIdx: number) => (
+                            <li key={actIdx} className="flex items-start gap-1.5 leading-snug">
+                              <ArrowRight className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                              <span>{action}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {prog.progressionMechanism && (
+                      <div className="bg-amber-500/5 border border-amber-500/20 p-2.5 rounded-lg space-y-1">
+                        <span className="text-[9px] font-mono font-bold uppercase text-amber-400">
+                          Why Task A Enables Task B
+                        </span>
+                        <p className="text-[11px] text-amber-200/90 leading-tight">
+                          {prog.progressionMechanism}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -987,12 +1172,12 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <span className={`text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full border ${catColor.bg} ${catColor.text} ${catColor.border}`}>
-                              {CATEGORY_NAMES[planned.category as keyof typeof CATEGORY_NAMES] || planned.category}
+                              Tracking: {CATEGORY_NAMES[planned.category as keyof typeof CATEGORY_NAMES] || planned.category}
                             </span>
                             <h4 className="text-base font-bold text-white mt-1.5">{planned.name}</h4>
                             {planned.autoAdded && (
                               <span className="inline-block mt-1 text-[10px] font-mono text-violet-300 bg-violet-500/10 border border-violet-500/25 px-2 py-0.5 rounded-full">
-                                NEXUS added — pillar balance
+                                NEXUS added
                               </span>
                             )}
                           </div>

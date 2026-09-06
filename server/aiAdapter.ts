@@ -1,10 +1,18 @@
-import { buildAdaptiveTimeline, buildTimelineMilestones, formatTimelineDays } from '../src/utils/timelinePlanner';
+import {
+  buildAdaptiveTimeline,
+  buildTimelineMilestones,
+  formatTimelineDays,
+  buildMacroPhases,
+  buildCheckpoints,
+  buildMicroProgression,
+} from '../src/utils/timelinePlanner';
 import {
   analyzeIntakeCoverage,
   buildIntakeCoverageBlock,
   extractGoalHintsFromTranscript,
   ensurePillarCoverage,
   normalizeBlueprint,
+  mapToPassiveCategory,
 } from '../src/utils/blueprintNormalizer';
 import { fetchGoalResearch } from './searchService';
 import { formatIdentityForPrompt, heuristicIdentityFromTranscript, mergeIdentity, normalizeExtractedIdentity } from '../src/utils/userIdentity';
@@ -872,60 +880,44 @@ LOCAL CONTEXT:
 
   const { max: bubbleMax, instruction: bubbleInstruction } = pickBubbleGuidance(stage, isAngry);
 
-  // â”€â”€â”€ Goal Scout prompt (Streamlined Whole-Life Intake Funnel) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Goal Scout prompt (Targeted 4-Question Diagnostic Interview) ────────────
   const userTurnsCount = (params.messages || []).filter((m) => m.sender === 'user').length;
 
   const coverage = analyzeIntakeCoverage(params.messages || [], params.userContext?.userIdentity);
   const intakeBlock = buildIntakeCoverageBlock(coverage);
 
-  const goalScoutPrompt = `GOAL SCOUT — Lifetime Discovery (not yearly goals)
+  const goalScoutPrompt = `GOAL SCOUT — Targeted Diagnostic Intake & Ambition Discovery
 
-You are NEXUS. This is a ONE-TIME setup chat. Your job is to understand this person deeply enough to build a LIFETIME growth plan they will carry for years — not a New Year's resolution list.
+You are NEXUS. This is a concise, targeted diagnostic intake to understand the user's specific ambition and current state before building their progressive roadmap.
 
-FOUR MISSIONS (collect all before finishing):
-1. WHO THEY ARE — name, where they live (city/country), what they do (work/study), key relationships (light touch)
-2. LIFE GOALS — what they want to achieve/become in their LIFE (career mastery, health, purpose, legacy). NOT "goals this year."
-3. WHERE THEY STAND — current level in each pillar: health, smarts (learning/career), selfCare, happiness, spiritual
-4. SETBACKS — what stops them, patterns, struggles, addictions, what failed before
+CORE ARCHITECTURAL RULES (MANDATORY):
+- The app's tracking categories (Physical, Spiritual, Mental, Self-Care, Happiness) are strictly PASSIVE RECORD-KEEPING AND MONITORING TAGS.
+- You MUST NEVER restrict, filter, limit, or force the user's goals into pre-defined categories.
+- You MUST NEVER ignore user ambitions (such as financial goals, career goals, or business ambitions) simply because they do not match a pre-defined category.
+- The user's input goals are the ONLY foundation for the roadmap you generate. The monitoring criteria exist purely as secondary background metrics to display progress over time.
+
+THE 4 DIAGNOSTIC QUESTIONS TO COVER:
+Engage in a concise, targeted interview asking 3 to 4 direct, structured questions covering:
+1. Specific Goal & Scope: What exact result do they want? (e.g. "Become a millionaire", "Build a SaaS app", "Lose 20 lbs", "Master cybersecurity")
+2. Current Baseline: Where are they starting from right now? (e.g. zero savings, starting from scratch, intermediate, complete beginner)
+3. Primary Blocker / Setback: What is currently holding them back? (e.g. laziness, procrastination, lack of knowledge, poor time management, lack of capital, low discipline)
+4. Time & Resource Commitment: How many hours per day or week can they realistically dedicate?
 
 ${intakeBlock}
 
-CRITICAL RELEVANCE RULES:
-- Every question MUST serve mission 1, 2, 3, or 4. If it doesn't, DO NOT ask it.
-- NEVER ask about: operating systems, software, tools, apps, brands, hardware, technical setup, or trivia.
-  BAD: "what OS do u use?" when they said cybersecurity. GOOD: "what drew u to cybersecurity — career switch or passion?"
-- TOPIC LOCK: React to what they JUST said. Mirror their topic. If they talk about cybersecurity, stay on career/skills/motivation — do NOT pivot to unrelated tech details.
-- ONE question per turn maximum. React warmly first, THEN ask.
-- Do NOT build schedules or daily plans in chat — that happens after.
-
-FORBIDDEN QUESTION TYPES:
-- Tool/software/OS questions unless they explicitly said "I want to master Linux"
-- Generic filler ("tell me more about yourself") when you can ask something specific
-- Do NOT re-ask facts already in STRUCTURED IDENTITY. Infer who they are from meaning, not keyword hits.
-- Yearly/quarterly framing ("goals for 2026") — always frame as LIFE
-
-INTAKE FLOW (flexible — follow INTAKE STATUS priority, not rigid turn numbers):
-- Early: name + where they live + what they do
-- Middle: their biggest LIFE visions (follow THEIR thread deeply, one topic at a time)
-- Then: gently touch any uncovered pillars ("random q — do u ever think about [pillar]?")
-- Late: setbacks, what stopped them before, emotional WHY
-- Final: how much time per day they can commit + morning/night preference
-- When missions 1-4 are covered OR user says "ready" → end with <<READY_FOR_PLAN>>
-
-PILLAR MAPPING (for your notes):
-- health = fitness, body, sleep, nutrition (physicality)
-- smarts = learning, career, skills, reading
-- selfCare = rest, routines, stress management
-- happiness = joy, relationships, hobbies, fun
-- spiritual = purpose, meditation, gratitude, values, inner peace
+CRITICAL INTERVIEW GUIDELINES:
+- Ask ONE concise question per turn. React warmly and directly to what they just said, then ask the next missing diagnostic question.
+- Do NOT interrogate about 5 life pillars (e.g. do NOT ask random filler questions like "what about spirituality?" or "what about walking?"). Follow the user's specific goal thread.
+- If the user identifies psychological/behavioral blockers (laziness, lack of focus, low discipline), acknowledge them with empathy — your roadmap will address them first.
+- Only after the 4 diagnostic questions are answered, celebrate briefly and output: <<READY_FOR_PLAN>> on its own line. If the user says "ready" / "build my plan" before the diagnostic is complete, ask the next missing diagnostic question instead.
 
 TEXTING STYLE:
-- Sound like a real person texting a friend, not a chatbot. Mostly lowercase. Contractions. Short when they are short, longer when the topic is real.
-- Use smiley and face emojis FREELY and naturally 😊 😄 💪 🔥 ✨ 🙌 😎 🫶 🤩 😂 💀 🫡 🎯 — they should appear in most messages like a real texter. Avoid using the same emoji twice in a row.
-- React to what they just said first. One question max. Don't lecture.
+- Sound like a real person texting a friend, not a robotic intake form. Mostly lowercase, natural contractions.
+- Use smiley and face emojis freely and naturally 😊 😄 💪 🔥 ✨ 🙌 😎 🫶 🤩 😂 💀 🫡 🎯.
+- React to what they just said first. ONE question maximum per turn.
 - ${bubbleInstruction}
-${userTurnsCount >= 8 && coverage.nextPriority === 'complete' ? '\nYou have enough! Briefly celebrate what you learned, then end with: <<READY_FOR_PLAN>> on its own line.' : ''}
-If user says "ready" / "build my plan" at any point → <<READY_FOR_PLAN>>`;
+${userTurnsCount >= 4 && coverage.diagnosticComplete ? '\nYou have sufficient diagnostic data! Briefly confirm what you learned, then end with: <<READY_FOR_PLAN>> on its own line.' : ''}
+If user says "ready" / "build my plan" before all 4 diagnostic fields are collected, ask the next missing diagnostic question. Only output <<READY_FOR_PLAN>> once the diagnostic is complete.`;
 
   // â”€â”€â”€ Daily Companion prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const dailyChatPrompt = `DAILY COMPANION CHAT
@@ -1171,7 +1163,8 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
     });
 
-    const readyForPlan = /<<READY_FOR_PLAN>>/i.test(raw);
+    const responseCoverage = isOnboarding ? analyzeIntakeCoverage(params.messages || [], params.userContext?.userIdentity) : undefined;
+    const readyForPlan = /<<READY_FOR_PLAN>>/i.test(raw) && (!isOnboarding || Boolean(responseCoverage?.diagnosticComplete));
     const planApproved = /<<PLAN_APPROVED>>/i.test(raw);
 
     const cleanedRaw = raw
@@ -1230,7 +1223,8 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       onDelta(chunk);
     }
 
-    const readyForPlan = /<<READY_FOR_PLAN>>/i.test(raw);
+    const responseCoverage = isOnboarding ? analyzeIntakeCoverage(params.messages || [], params.userContext?.userIdentity) : undefined;
+    const readyForPlan = /<<READY_FOR_PLAN>>/i.test(raw) && (!isOnboarding || Boolean(responseCoverage?.diagnosticComplete));
     const planApproved = /<<PLAN_APPROVED>>/i.test(raw);
     const cleanedRaw = raw
       .replace(/<<READY_FOR_PLAN>>/gi, '')
@@ -1273,8 +1267,10 @@ EXTRACTION RULES (mandatory):
 - Infer from FULL SENTENCE MEANING, not keyword hits. Read the whole message.
 - Do NOT extract "work" from someone just mentioning a company in passing — only if they say they work there.
 - Do NOT extract "city" from someone mentioning a place as a destination — only if they say they live/are based there.
-- "lifeGoals" = long-term life ambitions, not to-do tasks. Only extract if they express a personal aspiration.
-- "setbacks" = patterns that stop them (procrastination, past failures, addiction). Not one-off complaints.
+- "lifeGoals" = specific ambition or desired result (e.g. build a business, become a millionaire, lose 20 lbs).
+- "currentBaseline" = where they are starting from right now (zero savings, beginner, starting from scratch).
+- "primaryBlockers" = key obstacles holding them back (laziness, procrastination, lack of focus, poor time management, lack of capital).
+- "setbacks" = patterns that stop them (past failures, addictions).
 - "relationships" = key people in their life (partner, kids, family). Only extract if meaningful context is provided.
 
 NEGATIVE EXAMPLES (do NOT do this):
@@ -1297,6 +1293,8 @@ Return JSON:
   "work": "",
   "relationships": "",
   "lifeGoals": [],
+  "currentBaseline": "",
+  "primaryBlockers": [],
   "pillarNotes": { "health": "", "smarts": "", "selfCare": "", "happiness": "", "spiritual": "" },
   "setbacks": [],
   "dailyCapacity": "",
@@ -1397,45 +1395,119 @@ Return JSON:
         messages: [
           {
             role: 'system',
-            content: `You build LIFETIME habit plans from Goal Scout discovery chats — plans the user carries for years, not yearly resolutions.
+            content: `You build SEQUENTIAL & PROGRESSIVE LIFETIME ROADMAPS from Goal Scout diagnostic interviews.
 
-The app tracks 5 life pillars: health (physicality), smarts (learning/career), selfCare, happiness, spiritual.
+CORE ARCHITECTURAL RULES (MANDATORY):
+- The app's tracking categories (Physical, Spiritual, Mental, Self-Care, Happiness) are strictly PASSIVE RECORD-KEEPING AND MONITORING TAGS.
+- You MUST NEVER restrict, filter, limit, or force the user's goals into these monitoring categories.
+- You MUST NEVER ignore user ambitions (such as financial goals, career goals, or business ambitions) simply because they do not match a pre-defined category.
+- The user's input goals are the ONLY foundation for the roadmap you generate. The monitoring criteria exist purely as secondary background metrics to display progress over time.
 
-RULES:
-1. Extract LIFE goals from the transcript — career mastery, long-term health, purpose, legacy. NOT "goals for this year."
-2. Create habits from STRUCTURED IDENTITY + transcript meaning, not keyword matching. At most 2 daily habits for a new user — extra supporting habits MUST be weekly. Total goals 4-7 is enough.
-3. For pillars the user never discussed, mark goals with autoAdded:true and autoAddedReason explaining why (e.g. "You didn't mention spirituality — I added a small gratitude habit so all areas stay balanced").
-4. Calibrate categoryBaselines: never-mentioned pillar = 20-30, struggling = 25-40, moderate = 45-55, strong = 60-75.
-5. goalCorrelations: link goals that reinforce each other when one is achieved (use EXACT goal names from plannedGoals).
-6. goalStackUps: primaryGoal gets supportingGoals stacked onto it (e.g. morning walk stacks before learning session).
-7. ROADBLOCKS (CRITICAL): Extract EVERY setback, struggle, addiction, or failure pattern the user mentioned (e.g. PMO, laziness, procrastination, phone addiction, binge eating, lack of discipline, distraction, anxiety). Create a separate roadblock entry for EACH one with a specific, practical solution and list all goals it threatens in affectedGoals[]. Do NOT skip any setback the user mentioned.
-8. Timelines: use research context for realistic mastery timelines. Foundation phase (days 1-30), scaling (30-90), mastery (90+). Lifelong goals may have estimatedDaysToMastery of 365-1095+.
-9. userProfileSummary: 2-3 sentences on who they are (location, work, relationships).
-10. extractedSetbacks: array of setback strings from the chat — be exhaustive, list every single one.
-11. lifetimeMegaGoals: Extract BIG ASPIRATIONAL goals the user stated that are ENDPOINTS not habits (e.g. "become a millionaire", "have an 80kg physique", "become a doctor", "own a house", "start a business"). These are DESTINATION goals, not daily habits. List them all here even if they overlap with plannedGoals — they show the user's ultimate vision.
+RULE ON ADDRESSING BLOCKERS FIRST:
+If the user identifies a psychological or behavioral blocker (e.g. laziness, lack of focus, low discipline, procrastination, phone addiction):
+- Phase 1 MUST focus on Blocker Neutralization using low-friction micro-habits (e.g. 15–30 minutes per day) to build momentum and break inertia.
+- Once consistency is established, systematically scale up workload intensity in subsequent phases.
+
+STRUCTURE OF THE OUTPUT PLAN (MANDATORY):
+1. Executive Strategy Summary:
+   - Clear statement of the goal, total estimated timeline, and the overarching strategic approach.
+2. Macro-View (Multi-Year / Phase Breakdown):
+   - Outline key phases across years or major stages (e.g. Phase 1: Mindset & Baseline Skill; Phase 2: Income Growth & Systems; Phase 3: Scaling & Wealth Accumulation).
+   - Set concrete milestone conditions required to transition from one phase to the next.
+3. Medium-View (Checkpoint Schedule):
+   - Clear checkpoints for Months 1–3, Months 4–6, Months 7–12, etc.
+   - Specify what exact output or metric must be achieved by the end of each checkpoint so the user clearly understands how tomorrow differs from today.
+4. Micro-View (Daily & Weekly Action Progression):
+   - Provide concrete, evolving daily tasks that build on one another over time.
+   - Ensure daily actions evolve: Day 1–14 tasks establish foundation/habits; Day 15–30 tasks build specific capabilities; Month 2+ tasks execute real-world projects.
+   - Explain explicitly how doing Task A today enables Task B tomorrow, ensuring the daily routine never feels like a static, repetitive loop.
+
+5. Roadblocks & Solutions:
+   - Extract every setback and blocker mentioned (e.g. laziness, procrastination, phone addiction, fear of failure). Provide a specific blocker neutralization tactic for each.
 
 Return JSON only.`,
           },
           {
             role: 'user',
-            content: `Discovery Chat Transcript:
+            content: `Diagnostic Chat Transcript:
 ${JSON.stringify(transcript)}
 
-STRUCTURED IDENTITY (source of truth — do not invent a different person):
+STRUCTURED IDENTITY (source of truth — use user's exact ambition):
 ${JSON.stringify(identity || {})}
 
-Intake coverage analysis:
+Diagnostic coverage analysis:
 ${JSON.stringify(coverage)}
 
 ${researchContext ? `Research findings (use for realistic timelines and setbacks):\n${researchContext}\n` : ''}
-Return JSON:
+Return JSON strictly following this schema:
 {
   "userName": "preferred name",
-  "masterVision": "2 clear sentences — their LIFETIME vision, not yearly",
-  "userProfileSummary": "who they are: location, work, relationships",
-  "extractedSetbacks": ["procrastination on X", "..."],
+  "masterVision": "2 clear sentences — their overarching lifetime vision",
+  "executiveSummary": "Statement of the primary goal, total estimated timeline, and the overarching strategic approach.",
+  "userProfileSummary": "who they are: baseline, work/life context, commitments",
+  "extractedSetbacks": ["laziness on X", "distraction by phone", "..."],
   "overallWillpowerIndex": 82,
   "categoryBaselines": { "health": 50, "spiritual": 50, "smarts": 50, "selfCare": 50, "happiness": 50 },
+  "macroPhases": [
+    {
+      "phaseNumber": 1,
+      "title": "Phase 1: Blocker Neutralization & Foundation",
+      "timeline": "Month 1 (Days 1–30)",
+      "transitionCondition": "Zero multi-day lapses for 21 days; friction eliminated; micro-habit automated.",
+      "description": "Deploy 15–30 min low-friction daily micro-habits to kill inertia and build consistency."
+    },
+    {
+      "phaseNumber": 2,
+      "title": "Phase 2: Core Capability & System Building",
+      "timeline": "Months 2–6",
+      "transitionCondition": "Intermediate project artifact delivered and 80%+ consistency over 60 days.",
+      "description": "Ramp focus duration to 45–60 min deep practice and build production deliverables."
+    },
+    {
+      "phaseNumber": 3,
+      "title": "Phase 3: Scaling, Leverage & Compounding",
+      "timeline": "Months 6+",
+      "transitionCondition": "Full mastery benchmarks satisfied with sustainable real-world execution.",
+      "description": "Full-scale execution, monetization/leverage, and continuous compounding."
+    }
+  ],
+  "checkpoints": [
+    {
+      "period": "Months 1–3",
+      "targetOutputMetric": "Exact deliverable / output metric required by Month 3",
+      "description": "What is achieved during this first quarter"
+    },
+    {
+      "period": "Months 4–6",
+      "targetOutputMetric": "Exact deliverable / output metric required by Month 6",
+      "description": "What is achieved during this second quarter"
+    },
+    {
+      "period": "Months 7–12",
+      "targetOutputMetric": "Exact deliverable / output metric required by Month 12",
+      "description": "What is achieved by end of Year 1"
+    }
+  ],
+  "microProgression": [
+    {
+      "dayRange": "Days 1–14",
+      "focus": "Blocker Neutralization / Foundation",
+      "dailyActions": ["Specific 15-min daily action", "Immediate environmental cue setup"],
+      "progressionMechanism": "Doing Task A today eliminates inertia and builds the neurological habit necessary for Task B."
+    },
+    {
+      "dayRange": "Days 15–30",
+      "focus": "Capability Building",
+      "dailyActions": ["Specific 30-45 min skill building action", "Daily mini-deliverable"],
+      "progressionMechanism": "Freed cognitive capacity from foundation allows handling deeper workload without burnout."
+    },
+    {
+      "dayRange": "Month 2+",
+      "focus": "Real-World Project Execution",
+      "dailyActions": ["Deep work block on core milestone", "Weekly shipping metric"],
+      "progressionMechanism": "Real-world project execution compounds previous capability into tangible outcomes."
+    }
+  ],
   "plannedGoals": [{
     "name": "concrete daily habit name",
     "description": "specific daily execution",
@@ -1445,37 +1517,54 @@ Return JSON:
     "basePoints": 5,
     "targetFrequency": "daily",
     "autoAdded": false,
-    "autoAddedReason": "only if autoAdded is true",
+    "autoAddedReason": "",
     "linkedGoalName": "optional — name of goal this stacks onto",
     "chanceOfAchievement": 80,
     "willpowerStrain": "Low|Medium|High",
     "timelineSummary": "lifetime arc summary",
-    "timelineMap": ["Phase 1: Foundation (Days 1-30)", "Phase 2: ...", "Phase 3: ..."],
-    "timelinePhase1": "Days 1-30: Foundation",
-    "timelinePhase2": "Days 30-90: Consistency",
-    "timelinePhase3": "Days 90+: Mastery",
+    "timelineMap": ["Phase 1: Blocker Neutralization (Days 1-30)", "Phase 2: ...", "Phase 3: ..."],
+    "timelinePhase1": "Days 1-30: Foundation / Blocker Neutralization",
+    "timelinePhase2": "Days 30-90: Capability Depth",
+    "timelinePhase3": "Days 90+: Mastery & Scaling",
+    "transitionCondition": "Transition condition to Phase 2",
     "estimatedDaysToMastery": 180,
     "timelineRange": { "minDays": 90, "maxDays": 365 }
   }],
-  "goalCorrelations": [{ "goals": ["Exact Goal Name 1", "Exact Goal Name 2"], "insight": "how achieving one aids the other" }],
-  "goalStackUps": [{ "primaryGoal": "Primary Goal Name", "supportingGoals": ["Supporting Habit"], "rationale": "why stacking works" }],
-  "roadblocks": [{ "roadblock": "exact setback name (e.g. PMO, laziness, phone addiction)", "solution": "specific practical strategy to overcome it with accountability steps", "affectedGoals": ["Goal Name 1", "Goal Name 2"] }],
-  "lifetimeMegaGoals": [{ "title": "Become a Millionaire", "description": "what achieving this looks like", "timelineEstimate": "5-10 years", "category": "smarts|health|happiness|spiritual|selfCare|life" }]
+  "goalCorrelations": [{ "goals": ["Goal 1", "Goal 2"], "insight": "how achieving one aids the other" }],
+  "goalStackUps": [{ "primaryGoal": "Primary Goal", "supportingGoals": ["Supporting Habit"], "rationale": "why stacking works" }],
+  "roadblocks": [{ "roadblock": "exact setback name", "solution": "specific blocker neutralization tactic", "affectedGoals": ["Goal 1"] }],
+  "lifetimeMegaGoals": [{ "title": "User's Major Ambition (e.g. Become a Millionaire)", "description": "what achieving this looks like", "timelineEstimate": "3-5 years", "category": "smarts|health|happiness|spiritual|selfCare" }]
 }`,
           },
         ],
       });
       const parsed = extractJson(raw);
-      if (parsed.masterVision || parsed.plannedGoals) {
+      if (parsed.masterVision || parsed.plannedGoals || parsed.executiveSummary) {
         const behaviorProfile = params.userContext?.behaviorProfile;
         const normalizedGoals = Array.isArray(parsed.plannedGoals)
           ? parsed.plannedGoals.map((goal: any) =>
               normalizeTimelineOutput(goal, behaviorProfile, researchContext)
             )
           : [];
+
+        const primaryGoal = parsed.lifetimeMegaGoals?.[0]?.title || parsed.plannedGoals?.[0]?.name || identity?.lifeGoals?.[0] || 'Core Ambition';
+        const hasBlocker = Boolean(parsed.extractedSetbacks?.length || identity?.primaryBlockers?.length || identity?.setbacks?.length);
+        const macroPhases = Array.isArray(parsed.macroPhases) && parsed.macroPhases.length
+          ? parsed.macroPhases
+          : buildMacroPhases(primaryGoal, 180, hasBlocker);
+        const checkpoints = Array.isArray(parsed.checkpoints) && parsed.checkpoints.length
+          ? parsed.checkpoints
+          : buildCheckpoints(primaryGoal, 180);
+        const microProgression = Array.isArray(parsed.microProgression) && parsed.microProgression.length
+          ? parsed.microProgression
+          : buildMicroProgression(primaryGoal, hasBlocker);
+
         const blueprint = normalizeBlueprint(
           {
             ...parsed,
+            macroPhases,
+            checkpoints,
+            microProgression,
             plannedGoals: normalizedGoals,
             lifetimeMegaGoals: Array.isArray(parsed.lifetimeMegaGoals) ? parsed.lifetimeMegaGoals : [],
           },
@@ -1521,7 +1610,7 @@ Return JSON:
     if (!this.hasKey()) return new FallbackAIAdapter().intakeTurn(params);
 
     const phaseInstructions: Record<string, string> = {
-      discovery: `You are NEXUS in goal discovery mode. Learn what this person genuinely wants to achieve — one question at a time. When you have 1+ real goals clearly stated, ask if there are more. When all goals are shared, end with <<READY_FOR_FEASIBILITY>>.`,
+      discovery: `You are NEXUS in Goal Scout diagnostic mode. Collect only the user's exact goal/scope, current baseline, primary blocker, and realistic time/resource commitment. Ask one missing field per turn. Tracking categories are passive metrics only; never force the ambition into a category. When all four fields are clear, end with <<READY_FOR_FEASIBILITY>>.`,
       disambiguation: `You are NEXUS clarifying a vague goal. Ask ONE targeted follow-up on what success looks like specifically. When concrete, end with <<READY_FOR_FEASIBILITY>>.`,
       feasibility: `You are NEXUS running feasibility on stated goals. Be honest and direct. If a timeline is unrealistic, say so clearly with a reason and a realistic alternative.`,
       willpower_check: `You are NEXUS testing real commitment without sounding like a form. Ask one probing question at a time, starting with the most important missing piece: sacrifice, past attempts, or what is different this time.`,
@@ -1808,49 +1897,76 @@ export class FallbackAIAdapter implements AIProvider {
 
   async synthesizeBlueprint(params: AISynthesizeBlueprintParams) {
     const behaviorProfile = params.userContext?.behaviorProfile;
+    const identity = params.userContext?.userIdentity;
+    const userGoal = identity?.lifeGoals?.[0] || 'Core Ambition & Mastery';
+    const hasBlocker = Boolean(identity?.primaryBlockers?.length || identity?.setbacks?.length);
+    const macroPhases = buildMacroPhases(userGoal, 180, hasBlocker);
+    const checkpoints = buildCheckpoints(userGoal, 180);
+    const microProgression = buildMicroProgression(userGoal, hasBlocker);
+
     const plannedGoals = [
       {
-        name: 'Daily Focused Learning Drill',
-        description: 'Spend 20 minutes on intentional skill acquisition or study.',
-        category: 'smarts',
+        name: `Daily ${userGoal} Focus`,
+        description: hasBlocker
+          ? `Phase 1 Blocker Neutralization: 15–20 minutes daily micro-habit to neutralize friction, break inertia, and establish consistency.`
+          : `Dedicated daily focused execution block on ${userGoal}.`,
+        category: mapToPassiveCategory(undefined, userGoal),
         reminderTime: '08:30',
         basePoints: 5,
         targetFrequency: 'daily',
         chanceOfAchievement: 85,
         willpowerStrain: 'Low',
-        timelinePhase1: 'Days 1â€“30: 10 mins daily micro-session',
-        timelinePhase2: 'Days 30â€“90: 20 mins consistent practice',
-        timelinePhase3: 'Days 90â€“180: Deep habit mastery',
+        timelinePhase1: hasBlocker ? 'Days 1–30: Blocker Neutralization (15m micro-habit)' : 'Days 1–30: Core habit lock-in',
+        timelinePhase2: 'Days 30–90: System scaling and workload ramp',
+        timelinePhase3: 'Days 90–180: Advanced output and real-world mastery',
       },
       {
-        name: 'Daily Physical Movement',
-        description: '30 minutes workout, cardio, or active movement.',
+        name: 'Daily Physical & Mental Energy Anchor',
+        description: '20–30 minutes active physical movement or walk to protect dopamine levels and mental focus.',
         category: 'health',
         reminderTime: '17:30',
         basePoints: 5,
         targetFrequency: 'daily',
         chanceOfAchievement: 80,
-        willpowerStrain: 'Medium',
-        timelinePhase1: 'Days 1â€“30: 15 mins daily brisk movement',
-        timelinePhase2: 'Days 30â€“90: 30 mins structured exercise',
-        timelinePhase3: 'Days 90â€“180: Peak physical conditioning',
+        willpowerStrain: 'Low',
+        timelinePhase1: 'Days 1–30: 15 min daily brisk movement',
+        timelinePhase2: 'Days 30–90: 30 min structured exercise',
+        timelinePhase3: 'Days 90–180: Peak physical conditioning',
       },
     ].map((goal) => normalizeTimelineOutput(goal, behaviorProfile));
 
     const blueprint = normalizeBlueprint(
       {
         userName: params.userContext?.userName || 'Friend',
-        masterVision: 'Build disciplined daily habits for physical health, sharp focus, and continuous personal growth.',
+        masterVision: `Achieve ${userGoal} through sequential daily execution and progressive mastery.`,
+        executiveSummary: `Targeted roadmap for ${userGoal}: Phase 1 eliminates friction and neutralizes blockers with low-friction micro-habits, Phase 2 scales focus depth and capability, Phase 3 executes full-scale compounding output.`,
         overallWillpowerIndex: 80,
         categoryBaselines: { health: 50, spiritual: 50, smarts: 50, selfCare: 50, happiness: 50 },
         plannedGoals,
+        macroPhases,
+        checkpoints,
+        microProgression,
+        lifetimeMegaGoals: [
+          {
+            title: userGoal,
+            description: 'Major lifetime ambition identified from Goal Scout',
+            timelineEstimate: 'Multi-Year Master Target',
+            category: mapToPassiveCategory(undefined, userGoal),
+          },
+        ],
         goalCorrelations: [
-          { goals: ['Daily Physical Movement', 'Daily Focused Learning Drill'], insight: 'Physical exercise releases BDNF, directly enhancing cognitive retention and focus.' },
+          { goals: ['Daily Physical & Mental Energy Anchor', `Daily ${userGoal} Focus`], insight: 'Physical movement protects dopamine baseline and directly enhances cognitive focus.' },
         ],
         goalStackUps: [
-          { primaryGoal: 'Daily Focused Learning Drill', supportingGoals: ['Daily Physical Movement'], rationale: 'Movement in the afternoon prevents cognitive fatigue and restores focus.' },
+          { primaryGoal: `Daily ${userGoal} Focus`, supportingGoals: ['Daily Physical & Mental Energy Anchor'], rationale: 'Movement prevents cognitive fatigue and restores execution stamina.' },
         ],
-        roadblocks: [{ roadblock: 'Inconsistency on busy days', solution: 'Do a 5-minute micro-version rather than skipping completely.', affectedGoals: ['Daily Physical Movement'] }],
+        roadblocks: [
+          {
+            roadblock: identity?.primaryBlockers?.[0] || 'Activation inertia & inconsistency',
+            solution: 'Phase 1 Blocker Neutralization: 2-minute rule micro-activation. Execute the smallest viable step daily without relying on motivation.',
+            affectedGoals: [`Daily ${userGoal} Focus`],
+          },
+        ],
       },
       params.transcript || [],
       params.userContext?.userIdentity

@@ -68,8 +68,13 @@ export function fallbackLapseRecovery(missedDays: number, goalName: string): str
 }
 
 export function fallbackIntakeChatReply(userText: string, phase: string): string {
-  if (phase === 'discovery') return `got it! tell me more \u2014 what does success actually look like for that goal? like specifically 👀`;
-  if (phase === 'disambiguation') return `okay so just to make sure im tracking \u2014 what would "done" look like for this one?`;
-  if (phase === 'feasibility') return `let me be real with u about that timeline \u2014 can we talk through what's realistic here?`;
-  return `okay noted \u2014 anything else u wanna add before we lock this in?`;
+  if (phase === 'discovery' || phase === 'specificGoal')
+    return `yo! let's figure out what u actually want to achieve. what's the exact result or ambition u want to build? (e.g. build a SaaS app, become a millionaire, lose 20 lbs, master coding) 🎯`;
+  if (phase === 'currentBaseline')
+    return `gotchu! where are u starting from right now? (e.g. starting from scratch, zero savings, intermediate, beginner) 👀`;
+  if (phase === 'primaryBlocker')
+    return `real talk — what is currently holding u back or stopping u? (e.g. laziness, procrastination, poor time management, lack of capital, distraction) 🛑`;
+  if (phase === 'timeCommitment' || phase === 'feasibility')
+    return `how much time per day or week can u realistically dedicate to this? 🔥`;
+  return `noted! looks like we have what we need — ready to build your roadmap? <<READY_FOR_PLAN>>`;
 }

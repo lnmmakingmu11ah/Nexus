@@ -9,6 +9,7 @@ import { AiErrorPanel } from './AiErrorPanel';
 import { mergeIdentity } from '../utils/userIdentity';
 import { ensureNexusPersona } from '../utils/nexusPersona';
 import { UserIdentity } from '../types';
+import { analyzeIntakeCoverage } from '../utils/blueprintNormalizer';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     {
       id: 'init-1',
       sender: 'ai',
-      text: "hey welcome to NEXUS 😊 im gonna get to know u — not just this year, but ur whole life vision. where u live, what u do, what u wanna become, what's been holding u back... then i build u a lifetime plan. what should i call u?",
+      text: "hey welcome to NEXUS 😊 lets figure out what u actually want to build. what specific goal or ambition do u want to achieve? (e.g. build a business, become a millionaire, lose 20 lbs, master coding) and what should i call u?",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -67,8 +68,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     if (m?.[1] && !userNameInput) setUserNameInput(m[1]);
   };
 
+  const intakeCoverage = analyzeIntakeCoverage(
+    chatMessages.map((m) => ({ sender: m.sender, text: m.text })),
+    identity
+  );
+  const canLaunchPlan = intakeCoverage.diagnosticComplete;
+
   const handleLaunchBackgroundPlan = () => {
-    if (isStartingPlan) return;
+    if (isStartingPlan || !canLaunchPlan) return;
     setIsStartingPlan(true);
     const transcript = chatMessages.map((m) => ({ sender: m.sender, text: m.text }));
 
@@ -118,7 +125,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
     if (
       /build my plan|lock the plan|generate|make the plan|yea (lock|build)|build it in the background/i.test(text) &&
-      (readyForPlan || chatMessages.length >= 4)
+      canLaunchPlan
     ) {
       setInputText('');
       handleLaunchBackgroundPlan();
@@ -256,7 +263,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     onComplete(partialConfig, []);
   };
 
-  const showPlanCta = readyForPlan || chatMessages.filter((m) => m.sender === 'user').length >= 5;
+  const showPlanCta = canLaunchPlan;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md overflow-y-auto flex justify-center items-start p-3 sm:p-4">

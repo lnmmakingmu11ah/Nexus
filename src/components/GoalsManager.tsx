@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { Target, Plus, Trash2, Edit2, Sparkles, Check, Brain, Shield, Compass, BookOpen, Folder, FolderPlus, Bell, Clock, Link2, Layers, ChevronDown, ChevronUp, BarChart2, Zap } from 'lucide-react';
-import { CATEGORY_NAMES, CategoryKey, Goal, GoalEffect, UserConfig, PlannedTask, Milestone, GoalDependency } from '../types';
+import { CATEGORY_NAMES, CategoryKey, Goal, GoalEffect, UserConfig, PlannedTask, Milestone, GoalDependency, DailyGoalLog } from '../types';
 import { STARTER_GOALS } from '../constants';
 import { AdaptiveScheduler } from './AdaptiveScheduler';
 import { GoalIntakeChat } from './GoalIntakeChat';
 import { DailyPlanView } from './DailyPlanView';
 import { loadCustomFolders, saveCustomFolders } from '../utils/storage';
+import { GoalPathwayModal } from './GoalPathwayModal';
 
 interface GoalsManagerProps {
   goals: Goal[];
   userConfig?: UserConfig;
+  dailyLogs?: DailyGoalLog[];
+  todayStr?: string;
   onSaveGoal: (goal: Goal) => void;
   onDeleteGoal: (goalId: string) => void;
   onAddPresetGoals: () => void;
@@ -26,6 +29,8 @@ interface GoalsManagerProps {
 export const GoalsManager: React.FC<GoalsManagerProps> = ({
   goals,
   userConfig,
+  dailyLogs = [],
+  todayStr = new Date().toISOString().split('T')[0],
   onSaveGoal,
   onDeleteGoal,
   onAddPresetGoals,
@@ -37,6 +42,7 @@ export const GoalsManager: React.FC<GoalsManagerProps> = ({
   onUpdateIntakeState,
   onToggleGoal,
 }) => {
+  const [activePathwayGoal, setActivePathwayGoal] = useState<Goal | null>(null);
 
   const [editingGoal, setEditingGoal] = useState<Partial<Goal> | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -363,7 +369,8 @@ export const GoalsManager: React.FC<GoalsManagerProps> = ({
             .map((goal) => (
               <div
                 key={goal.id}
-                className="bg-zinc-900 border border-zinc-800/90 rounded-2xl p-4 shadow-lg hover:border-zinc-700 transition-all flex flex-col justify-between"
+                onClick={() => setActivePathwayGoal(goal)}
+                className="bg-zinc-900 border border-zinc-800/90 rounded-2xl p-4 shadow-lg hover:border-amber-500/50 transition-all flex flex-col justify-between cursor-pointer"
               >
 
               <div>
@@ -424,16 +431,35 @@ export const GoalsManager: React.FC<GoalsManagerProps> = ({
                     <h3 className="text-sm font-semibold text-white mt-1.5">{goal.name}</h3>
                   </div>
 
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1.5">
                     <button
-                      onClick={() => handleOpenEdit(goal)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActivePathwayGoal(goal);
+                      }}
+                      title="View AI Roadmap: today's task, tomorrow's expected task, and milestones"
+                      className="px-2.5 py-1 text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-semibold"
+                    >
+                      <Compass className="w-3 h-3 text-amber-400" />
+                      <span>Roadmap</span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEdit(goal);
+                      }}
                       className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                      title="Edit Goal"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => onDeleteGoal(goal.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteGoal(goal.id);
+                      }}
                       className="p-1.5 text-zinc-400 hover:text-rose-400 hover:bg-zinc-800 rounded-lg transition-colors"
+                      title="Delete Goal"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -882,6 +908,32 @@ export const GoalsManager: React.FC<GoalsManagerProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Goal Pathway Modal */}
+      {activePathwayGoal && (
+        <GoalPathwayModal
+          goal={activePathwayGoal}
+          plannedTasks={plannedTasks}
+          milestones={milestones}
+          dailyLogs={dailyLogs}
+          userConfig={userConfig || {
+            onboarded: true,
+            lifePathGoal: 'Personal Growth',
+            age: 28,
+            sex: 'other',
+            categoryBaselines: { health: 50, spiritual: 50, smarts: 50, selfCare: 50, happiness: 50 },
+            absenceThresholdDays: 3,
+            dailyDecayRate: 2,
+            maxStreakMultiplier: 1.8,
+            streakRampDays: 10,
+            healthApiSyncEnabled: false,
+            privacyAccepted: true,
+          }}
+          todayStr={todayStr}
+          onClose={() => setActivePathwayGoal(null)}
+          onToggleGoal={onToggleGoal || (() => {})}
+        />
       )}
     </div>
   );
