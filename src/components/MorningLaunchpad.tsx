@@ -29,37 +29,36 @@ const STORAGE_KEY_PREFIX = 'nexus_launchpad_shown_';
 export function useMorningLaunchpad(goals: Goal[], todayStr: string) {
   const [showLaunchpad, setShowLaunchpad] = useState(false);
 
-  useEffect(() => {
-    const key = `${STORAGE_KEY_PREFIX}${todayStr}`;
-    const alreadyShown = localStorage.getItem(key);
-    if (!alreadyShown && goals.length > 0) {
-      // Small delay so the app fully mounts before the modal appears
-      const t = setTimeout(() => setShowLaunchpad(true), 1200);
-      return () => clearTimeout(t);
-    }
-  }, [todayStr, goals.length]);
-
+  // Manual launch or explicit call only — no unsolicited auto-popup hijacking the screen
+  const openLaunchpad = () => setShowLaunchpad(true);
   const dismiss = () => {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${todayStr}`, '1');
+    try {
+      const key = `${STORAGE_KEY_PREFIX}${todayStr}`;
+      localStorage.setItem(key, '1');
+    } catch {}
     setShowLaunchpad(false);
   };
 
-  return { showLaunchpad, dismissLaunchpad: dismiss };
+  return { showLaunchpad, openLaunchpad, dismissLaunchpad: dismiss };
 }
 
 export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
-  goals,
+  goals = [],
   todayStr,
   userName = 'Champion',
   onClose,
 }) => {
-  // Pick quote deterministically by day
-  const dayIndex = new Date(todayStr).getDay();
-  const quote = DAILY_QUOTES[dayIndex % DAILY_QUOTES.length];
+  // Safely pick quote deterministically by day with fallback
+  const parsedDate = todayStr ? new Date(todayStr) : new Date();
+  const rawDay = isNaN(parsedDate.getTime()) ? 0 : parsedDate.getDay();
+  const quote = DAILY_QUOTES[rawDay % DAILY_QUOTES.length] || DAILY_QUOTES[0];
+
+  const displayName = (userName || 'Champion').trim();
+  const firstName = displayName ? displayName.split(' ')[0] : 'Champion';
 
   // Top 3 priority goals (incomplete today)
-  const priorityGoals = goals
-    .filter((g) => !g.archived)
+  const priorityGoals = (goals || [])
+    .filter((g) => g && !g.archived)
     .slice(0, 3);
 
   const hour = new Date().getHours();
@@ -68,13 +67,17 @@ export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md px-3 py-4">
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-3 py-4 cursor-pointer"
+      >
         <motion.div
-          initial={{ y: 60, opacity: 0, scale: 0.96 }}
+          onClick={(e) => e.stopPropagation()}
+          initial={{ y: 40, opacity: 0.8, scale: 0.98 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: 60, opacity: 0, scale: 0.96 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-          className="relative w-full max-w-sm bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-3xl shadow-2xl overflow-hidden"
+          exit={{ y: 40, opacity: 0, scale: 0.98 }}
+          transition={{ duration: 0.2 }}
+          className="relative w-full max-w-sm bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-3xl shadow-2xl overflow-hidden cursor-default"
         >
           {/* Glow accent */}
           <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-32 rounded-full bg-amber-400/10 blur-3xl pointer-events-none" />
@@ -85,7 +88,7 @@ export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
               <NexusLogo size="sm" animated />
               <div>
                 <p className="text-[11px] text-amber-400 font-mono font-semibold tracking-widest uppercase">Daily Launchpad</p>
-                <p className="text-[13px] font-bold text-white">{greeting}, {userName.split(' ')[0]}!</p>
+                <p className="text-[13px] font-bold text-white">{greeting}, {firstName}!</p>
               </div>
             </div>
             <button

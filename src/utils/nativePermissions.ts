@@ -189,20 +189,47 @@ type TapCallback = (data: NotificationTapData) => void;
  * Returns a cleanup function.
  */
 export function registerNotificationActionListener(cb: TapCallback): () => void {
-  if (Capacitor.isNativePlatform()) {
-    let handle: any;
-    LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
-      const extra = (action.notification as any)?.extra as NotificationTapData | undefined;
-      if (extra?.tab) cb(extra);
-    }).then((h) => { handle = h; }).catch(() => {});
-    return () => { handle?.remove?.(); };
-  }
+  try {
+    if (Capacitor.isNativePlatform()) {
+      let handle: any = null;
+      LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+        try {
+          const extra = (action?.notification as any)?.extra as NotificationTapData | undefined;
+          if (extra?.tab) cb(extra);
+        } catch (e) {
+          console.warn('Error in notification action callback:', e);
+        }
+      }).then((h) => {
+        handle = h;
+      }).catch((e) => {
+        console.warn('LocalNotifications.addListener failed:', e);
+      });
 
-  // Web fallback
-  const handler = (e: Event) => {
-    const data = (e as CustomEvent<NotificationTapData>).detail;
-    if (data?.tab) cb(data);
-  };
-  window.addEventListener('nexus-notification-tap', handler);
-  return () => window.removeEventListener('nexus-notification-tap', handler);
+      return () => {
+        try {
+          handle?.remove?.();
+        } catch {}
+      };
+    }
+
+    // Web fallback
+    const handler = (e: Event) => {
+      try {
+        const data = (e as CustomEvent<NotificationTapData>).detail;
+        if (data?.tab) cb(data);
+      } catch (e) {
+        console.warn('Error in web notification tap handler:', e);
+      }
+    };
+    window.addEventListener('nexus-notification-tap', handler);
+    return () => {
+      try {
+        window.removeEventListener('nexus-notification-tap', handler);
+      } catch {}
+    };
+  } catch (err) {
+    console.warn('registerNotificationActionListener threw:', err);
+    return () => {};
+  }
 }
+

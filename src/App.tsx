@@ -117,8 +117,8 @@ export default function App() {
   // Share recap card visibility
   const [showShareCard, setShowShareCard] = useState(false);
 
-  // Morning launchpad – shows once per day on first open
-  const { showLaunchpad, dismissLaunchpad } = useMorningLaunchpad(goals, todayStr);
+  // Morning launchpad modal state
+  const { showLaunchpad, openLaunchpad, dismissLaunchpad } = useMorningLaunchpad(goals, todayStr);
 
   // Initialize native status bar style and color on device mount
   // Register notification deep-link tap listener
@@ -128,12 +128,16 @@ export default function App() {
       StatusBar.setBackgroundColor({ color: '#09090b' }).catch(() => {});
     }
 
-    // Wire notification tap → tab navigation
+    // Wire notification tap → tab navigation with safe tab whitelist
+    const validTabs = new Set(['dashboard', 'aicoach', 'journal', 'goals', 'trends', 'insights', 'focus', 'longevity', 'achievements']);
     const cleanup = registerNotificationActionListener((data) => {
-      if (data.tab) setCurrentTab(data.tab);
+      if (data?.tab && validTabs.has(data.tab)) {
+        setCurrentTab(data.tab);
+      }
     });
     return cleanup;
   }, []);
+
 
   useEffect(() => {
     if (!userConfig.onboarded) return;
@@ -1077,8 +1081,10 @@ export default function App() {
             onTriggerStreakToast={triggerStreakToast}
             onUpdateUserConfig={handleUpdateUserConfig}
             onNavigateTab={(tab) => setCurrentTab(tab)}
+            onOpenLaunchpad={openLaunchpad}
           />
         )}
+
 
         {/* Rescue Habit prompt — shown inside dashboard tab when goals are slipping */}
         {currentTab === 'dashboard' && (

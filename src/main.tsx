@@ -6,6 +6,7 @@ import {SplashScreen} from '@capacitor/splash-screen';
 import App from './App.tsx';
 import './index.css';
 import {initSecureStorage} from './utils/storage';
+import {ErrorBoundary} from './components/ErrorBoundary';
 
 async function bootstrapNativeShell() {
   if (!Capacitor.isNativePlatform()) return;
@@ -32,7 +33,9 @@ async function bootstrapApp() {
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </StrictMode>,
   );
 }

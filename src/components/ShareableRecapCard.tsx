@@ -17,12 +17,18 @@ interface ShareableRecapCardProps {
 }
 
 function getWeekStats(goals: Goal[], dailyLogs: DailyGoalLog[], weekStartStr: string) {
-  const start = new Date(weekStartStr);
+  const start = weekStartStr ? new Date(weekStartStr) : new Date();
+  const validStart = isNaN(start.getTime()) ? new Date() : start;
   const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return d.toISOString().split('T')[0];
-  });
+    try {
+      const d = new Date(validStart);
+      d.setDate(validStart.getDate() + i);
+      return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  }).filter(Boolean);
+
 
   let totalCompleted = 0;
   let totalScheduled = 0;

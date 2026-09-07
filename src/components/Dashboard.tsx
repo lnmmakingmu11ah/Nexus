@@ -82,6 +82,7 @@ interface DashboardProps {
   onTriggerStreakToast?: (goalName: string, streakDays: number, msg?: string) => void;
   onUpdateUserConfig?: (updated: UserConfig) => void;
   onNavigateTab?: (tab: string) => void;
+  onOpenLaunchpad?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -100,7 +101,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onTriggerStreakToast,
   onUpdateUserConfig,
   onNavigateTab,
+  onOpenLaunchpad,
 }) => {
+
   const [activePathwayGoal, setActivePathwayGoal] = useState<Goal | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterFolder, setFilterFolder] = useState<string>('all');
@@ -349,16 +352,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
           </div>
-          {onNavigateTab && (
-            <button
-              type="button"
-              onClick={() => onNavigateTab('aicoach')}
-              className="self-start sm:self-auto shrink-0 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl border border-zinc-700 transition-colors flex items-center gap-1"
-            >
-              <span>View Blueprint</span>
-              <ArrowRight className="w-3 h-3 text-amber-400" />
-            </button>
-          )}
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            {onOpenLaunchpad && (
+              <button
+                type="button"
+                onClick={onOpenLaunchpad}
+                className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-semibold rounded-xl border border-amber-500/30 transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <span>🌅</span>
+                <span>Launchpad</span>
+              </button>
+            )}
+            {onNavigateTab && (
+              <button
+                type="button"
+                onClick={() => onNavigateTab('aicoach')}
+                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl border border-zinc-700 transition-colors flex items-center gap-1"
+              >
+                <span>View Blueprint</span>
+                <ArrowRight className="w-3 h-3 text-amber-400" />
+              </button>
+            )}
+          </div>
+
         </div>
       )}
 

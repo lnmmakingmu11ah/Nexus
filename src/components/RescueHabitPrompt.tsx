@@ -12,18 +12,27 @@ interface RescueHabitPromptProps {
 
 /** Returns consecutive missed days count for a goal (not counting today) */
 function getMissedDays(goal: Goal, dailyLogs: DailyGoalLog[], todayStr: string): number {
+  if (!goal || !dailyLogs) return 0;
   let missed = 0;
-  const today = new Date(todayStr);
+  const today = todayStr ? new Date(todayStr) : new Date();
+  if (isNaN(today.getTime())) return 0;
+
   for (let i = 1; i <= 7; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
-    const log = dailyLogs.find((l) => l.date === dateStr && l.goalId === goal.id);
-    if (log?.completed) break;
-    missed++;
+    try {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      if (isNaN(d.getTime())) break;
+      const dateStr = d.toISOString().split('T')[0];
+      const log = dailyLogs.find((l) => l.date === dateStr && l.goalId === goal.id);
+      if (log?.completed) break;
+      missed++;
+    } catch {
+      break;
+    }
   }
   return missed;
 }
+
 
 /** Generate a 2-minute micro-habit suggestion for a goal */
 function getMicroHabit(goal: Goal): string {
