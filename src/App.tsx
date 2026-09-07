@@ -22,11 +22,15 @@ import { LocationSettings } from './components/LocationSettings';
 import { AiServerSettings } from './components/AiServerSettings';
 import { PlanReviewModal } from './components/PlanReviewModal';
 import { HabitStackPrompt } from './components/HabitStackPrompt';
+import { MorningLaunchpad, useMorningLaunchpad } from './components/MorningLaunchpad';
+import { RescueHabitPrompt } from './components/RescueHabitPrompt';
+import { ShareableRecapCard } from './components/ShareableRecapCard';
 import { triggerHapticFeedback } from './utils/haptics';
 import { aiClient } from './services/aiClient';
 import { mergeMemory } from './utils/aiMemory';
 import { Capacitor } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { registerNotificationActionListener } from './utils/nativePermissions';
 
 import {
   AIDigest,
@@ -110,12 +114,25 @@ export default function App() {
   const [planBuildingStage, setPlanBuildingStage] = useState<string>('Analyzing your goals…');
   const [planBuildDone, setPlanBuildDone] = useState(false);
 
+  // Share recap card visibility
+  const [showShareCard, setShowShareCard] = useState(false);
+
+  // Morning launchpad – shows once per day on first open
+  const { showLaunchpad, dismissLaunchpad } = useMorningLaunchpad(goals, todayStr);
+
   // Initialize native status bar style and color on device mount
+  // Register notification deep-link tap listener
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
       StatusBar.setBackgroundColor({ color: '#09090b' }).catch(() => {});
     }
+
+    // Wire notification tap → tab navigation
+    const cleanup = registerNotificationActionListener((data) => {
+      if (data.tab) setCurrentTab(data.tab);
+    });
+    return cleanup;
   }, []);
 
   useEffect(() => {
@@ -1063,6 +1080,16 @@ export default function App() {
           />
         )}
 
+        {/* Rescue Habit prompt — shown inside dashboard tab when goals are slipping */}
+        {currentTab === 'dashboard' && (
+          <RescueHabitPrompt
+            goals={goals}
+            dailyLogs={dailyLogs}
+            todayStr={todayStr}
+            onToggleGoal={handleToggleGoal}
+          />
+        )}
+
         {currentTab === 'aicoach' && (
           <AICoachView
             userConfig={userConfig}
@@ -1136,6 +1163,19 @@ export default function App() {
             userConfig={userConfig}
             journals={journals}
           />
+        )}
+
+        {/* Share Week CTA — appears under Trends tab */}
+        {currentTab === 'trends' && (
+          <div className="flex justify-center mt-2 mb-4">
+            <button
+              onClick={() => setShowShareCard(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border border-amber-500/30 text-amber-300 text-sm font-semibold hover:from-amber-500/30 hover:to-emerald-500/30 transition-all shadow-sm"
+            >
+              <span>📤</span>
+              <span>Share My Weekly Progress</span>
+            </button>
+          </div>
         )}
 
         {currentTab === 'insights' && (
@@ -1248,6 +1288,33 @@ export default function App() {
 
       {/* Streak Milestone Toast Notifications */}
       <StreakToastContainer toasts={streakToasts} onDismiss={handleDismissToast} />
+
+      {/* Morning Launchpad — daily first-open modal */}
+      {showLaunchpad && (
+        <MorningLaunchpad
+          goals={goals}
+          todayStr={todayStr}
+          userName={userConfig.userName}
+          onClose={dismissLaunchpad}
+        />
+      )}
+
+      {/* Weekly Shareable Recap Card */}
+      {showShareCard && (
+        <ShareableRecapCard
+          goals={goals}
+          dailyLogs={dailyLogs}
+          scoreData={scoreData}
+          userConfig={userConfig}
+          todayStr={todayStr}
+          weekStartStr={(() => {
+            const d = new Date(todayStr);
+            d.setDate(d.getDate() - d.getDay());
+            return d.toISOString().split('T')[0];
+          })()}
+          onClose={() => setShowShareCard(false)}
+        />
+      )}
 
       {/* Floating Translucent Mobile Navigation Bar */}
       <FloatingBottomNav currentTab={currentTab} setCurrentTab={setCurrentTab} />

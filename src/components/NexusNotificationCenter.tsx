@@ -322,9 +322,33 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
     const urgentNudges = nudges.filter((n) => n.type === 'priority' || n.type === 'decay' || n.type === 'open_moment' || n.aiGenerated);
     urgentNudges.forEach((nudge) => {
       if (nativeNotifiedIds.has(nudge.id)) return;
+
+      // Emoji prefix by nudge type
+      const emojiMap: Record<string, string> = {
+        priority: '🎯',
+        habit: '🔥',
+        decay: '🛡️',
+        win: '🌟',
+        burnout: '🧠',
+        open_moment: '🌙',
+      };
+      const emoji = emojiMap[nudge.type] || '⚡';
+
+      // Deep-link tab mapping
+      const tabMap: Record<string, string> = {
+        priority: 'dashboard',
+        habit: 'dashboard',
+        decay: 'trends',
+        win: 'achievements',
+        burnout: 'insights',
+        open_moment: 'dashboard',
+      };
+      const tab = tabMap[nudge.type] || 'dashboard';
+
       sendLocalNotification({
-        title: nudge.title,
+        title: `${emoji} ${nudge.title}`,
         body: nudge.message,
+        data: { tab, goalId: nudge.goalId },
       }).catch((e) => {
         console.warn('Native nudge notification failed:', e);
       });

@@ -1,7 +1,8 @@
 import React, { ReactNode, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ShieldCheck, Download, Upload, Hexagon, Flame, RefreshCw, EyeOff, Settings, X, Check, Trophy } from 'lucide-react';
+import { ShieldCheck, Download, Upload, Flame, RefreshCw, EyeOff, Settings, X, Check, Trophy } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_NAMES, CategoryKey, UserConfig } from '../types';
+import { NexusLogo } from './NexusLogo';
 
 interface NavbarProps {
   currentTab: string;
@@ -72,11 +73,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center space-x-2.5 cursor-pointer group shrink-0 min-w-0"
             onClick={() => setCurrentTab('dashboard')}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 ring-1 ring-white/20 transition-transform group-hover:scale-105 shrink-0">
-              <div className="relative flex items-center justify-center">
-                <Hexagon className="w-6 h-6 text-emerald-200 stroke-[1.75]" />
-                <Flame className="w-3.5 h-3.5 text-amber-300 absolute fill-amber-300/50" />
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-950 flex items-center justify-center shadow-lg shadow-emerald-500/20 ring-1 ring-emerald-500/20 transition-transform group-hover:scale-105 shrink-0">
+              <NexusLogo size="sm" animated={false} />
             </div>
             <div className="min-w-0">
               <div className="flex items-center space-x-1.5 flex-wrap">

@@ -124,13 +124,15 @@ export async function requestNotificationPermission(): Promise<'granted' | 'deni
 }
 
 /**
- * Shows an immediate or scheduled local notification.
+ * Shows an immediate or scheduled local notification with optional deep-link data.
  */
 export async function sendLocalNotification(params: {
   title: string;
   body: string;
   id?: number;
   scheduleAt?: Date;
+  /** Deep-link payload: which tab to open and (optionally) which goalId to highlight */
+  data?: { tab: string; goalId?: string };
 }): Promise<void> {
   const notifId = params.id || Math.floor(Math.random() * 1000000);
 
@@ -144,6 +146,7 @@ export async function sendLocalNotification(params: {
             body: params.body,
             schedule: params.scheduleAt ? { at: params.scheduleAt } : undefined,
             sound: 'default',
+            extra: params.data || {},
           },
         ],
       });
@@ -156,12 +159,50 @@ export async function sendLocalNotification(params: {
   // Web Fallback
   if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
     try {
-      new Notification(params.title, {
+      const notif = new Notification(params.title, {
         body: params.body,
         icon: '/icon-192.png',
+        data: params.data,
       });
+      if (params.data) {
+        notif.onclick = () => {
+          window.focus();
+          // Custom event so App.tsx can navigate
+          window.dispatchEvent(
+            new CustomEvent('nexus-notification-tap', { detail: params.data })
+          );
+        };
+      }
     } catch (e) {
       console.warn('Web Notification constructor failed:', e);
     }
   }
+}
+
+export type NotificationTapData = { tab: string; goalId?: string };
+type TapCallback = (data: NotificationTapData) => void;
+
+/**
+ * Register a listener that fires when the user taps a NEXUS notification.
+ * On native: uses Capacitor LocalNotifications.addListener.
+ * On web: listens to the custom 'nexus-notification-tap' event.
+ * Returns a cleanup function.
+ */
+export function registerNotificationActionListener(cb: TapCallback): () => void {
+  if (Capacitor.isNativePlatform()) {
+    let handle: any;
+    LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+      const extra = (action.notification as any)?.extra as NotificationTapData | undefined;
+      if (extra?.tab) cb(extra);
+    }).then((h) => { handle = h; }).catch(() => {});
+    return () => { handle?.remove?.(); };
+  }
+
+  // Web fallback
+  const handler = (e: Event) => {
+    const data = (e as CustomEvent<NotificationTapData>).detail;
+    if (data?.tab) cb(data);
+  };
+  window.addEventListener('nexus-notification-tap', handler);
+  return () => window.removeEventListener('nexus-notification-tap', handler);
 }

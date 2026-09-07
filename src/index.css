@@ -55,16 +55,30 @@ body,
 
 /* ── Tab / page transitions ────────────────────────────────────────────── */
 @keyframes nexus-slide-up {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes nexus-fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+@keyframes nexus-slide-from-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes nexus-slide-from-left {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
 
 .nexus-page-enter {
   animation: nexus-slide-up 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.nexus-page-enter-right {
+  animation: nexus-slide-from-right 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.nexus-page-enter-left {
+  animation: nexus-slide-from-left 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Used on toasts / banners */
@@ -75,7 +89,7 @@ body,
 /* ── Bottom nav clearance ──────────────────────────────────────────────── */
 /* Extra padding so content never hides under the floating nav pill */
 .pb-nav {
-  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* ── iOS momentum scroll ───────────────────────────────────────────────── */

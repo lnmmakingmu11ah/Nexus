@@ -64,6 +64,7 @@ import { calculateNexusPoints } from '../utils/gamification';
 import { DailyJournal } from '../types';
 import { GoalPathwayModal } from './GoalPathwayModal';
 import { getGoalPathway } from '../utils/goalPathways';
+import { StreakBurst, useStreakBurst } from './StreakBurst';
 
 interface DashboardProps {
   scoreData: ScoreCalculationResult;
@@ -109,6 +110,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [newFolderNameInput, setNewFolderNameInput] = useState<string>('');
   const [showFolderModal, setShowFolderModal] = useState<boolean>(false);
   const [rewriteBannerDismissed, setRewriteBannerDismissed] = useState<boolean>(false);
+  const [burstGoalId, setBurstGoalId] = useState<string | null>(null);
+  const { burstActive, triggerBurst, resetBurst } = useStreakBurst();
 
   const showRewriteBanner =
     !rewriteBannerDismissed &&
@@ -427,7 +430,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </ResponsiveContainer>
           </div>
 
-          <div className="grid grid-cols-5 gap-2 pt-3 border-t border-zinc-800/60 text-center">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 pt-3 border-t border-zinc-800/60 text-center">
             {(Object.keys(CATEGORY_NAMES) as CategoryKey[]).map((catKey) => {
               const score = scoreData.scores[catKey];
               const decay = scoreData.absenceDecays[catKey];
@@ -1080,20 +1083,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                     <div className="flex items-start justify-between space-x-3 mb-2">
                       <div className="flex items-start space-x-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleGoal(goal.id);
-                          }}
-                          className="mt-0.5 text-zinc-400 hover:text-emerald-400 transition-colors focus:outline-none cursor-pointer"
-                          title="Check off today's habit"
-                        >
-                          {isCompleted ? (
-                            <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-500/20" />
-                          ) : (
-                            <Circle className="w-5 h-5 text-zinc-600 hover:text-emerald-400" />
+                        <div className="relative mt-0.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isCompleted) {
+                                setBurstGoalId(goal.id);
+                                triggerBurst();
+                              }
+                              onToggleGoal(goal.id);
+                            }}
+                            className="text-zinc-400 hover:text-emerald-400 transition-colors focus:outline-none cursor-pointer"
+                            title="Check off today's habit"
+                          >
+                            {isCompleted ? (
+                              <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-emerald-500/20" />
+                            ) : (
+                              <Circle className="w-5 h-5 text-zinc-600 hover:text-emerald-400" />
+                            )}
+                          </button>
+                          {burstGoalId === goal.id && (
+                            <StreakBurst
+                              active={burstActive}
+                              size={80}
+                              onDone={() => { resetBurst(); setBurstGoalId(null); }}
+                            />
                           )}
-                        </button>
+                        </div>
 
                         <div className="min-w-0 flex-1">
                           {/* Badges Row */}
@@ -1173,21 +1189,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </p>
 
                           {/* Tomorrow's Action Quick Preview Banner */}
-                          <div className="mt-2.5 p-2 rounded-lg bg-zinc-950/80 border border-amber-500/25 flex items-center justify-between gap-2 hover:bg-amber-500/10 transition-colors">
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              <span className="text-[9px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
-                                Tomorrow’s Step
+                          <div className="mt-2.5 p-2 rounded-lg bg-zinc-950/80 border border-amber-500/25 hover:bg-amber-500/10 transition-colors">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[9px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30">
+                                Tomorrow's Step
                               </span>
-                              <span className="text-[11px] text-zinc-300 font-medium break-words line-clamp-1">
-                                {tomorrowTaskMap[goal.id] || 'Deliberate practice & checkpoint'}
+                              <span className="text-[10px] font-bold text-amber-300">
+                                Roadmap &rarr;
                               </span>
                             </div>
-                            <span className="text-[10px] font-bold text-amber-300 flex items-center gap-0.5 shrink-0 ml-1">
-                              Roadmap &rarr;
-                            </span>
+                            <p className="text-[11px] text-zinc-300 font-medium leading-tight line-clamp-2">
+                              {tomorrowTaskMap[goal.id] || 'Deliberate practice & checkpoint'}
+                            </p>
                           </div>
                         </div>
                       </div>
+
 
                       {/* Streak Badge Component */}
                       <div className="flex flex-col items-end shrink-0">
