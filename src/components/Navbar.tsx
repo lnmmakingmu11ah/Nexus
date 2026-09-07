@@ -38,15 +38,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      if (currentScrollY <= 25) {
-        // At or reached the very top of the page -> always show
+      if (currentScrollY <= 5) {
+        // Only pops up when scrolled fully to the very top
         setIsHeaderHidden(false);
-      } else if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-        // Scrolling down -> hide upwards
+      } else if (currentScrollY > 20) {
+        // Hidden anywhere else while scrolling through page
         setIsHeaderHidden(true);
-      } else if (currentScrollY <= 40) {
-        // Scrolled all the way back up to the top -> re-pop up
-        setIsHeaderHidden(false);
       }
       lastScrollY.current = currentScrollY;
     };

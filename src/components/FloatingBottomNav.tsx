@@ -43,19 +43,23 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      
-      if (currentScrollY <= 25) {
-        // Scrolled all the way up and reached the top -> bring back up!
+      const windowHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const totalHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+
+      const isFullyAtTop = currentScrollY <= 5;
+      const isFullyAtBottom = (windowHeight + currentScrollY) >= (totalHeight - 20);
+
+      if (isFullyAtTop || isFullyAtBottom) {
+        // Only pops up when scrolled fully to the top or fully to the bottom
         setIsVisible(true);
         resetInactivityTimer(3500);
-      } else if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-        // Scrolling down -> hide downwards immediately
+      } else if (currentScrollY > 20) {
+        // Hidden anywhere in between while reading/scrolling
         setIsVisible(false);
         if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-      } else if (currentScrollY <= 40) {
-        // Reached near top
-        setIsVisible(true);
-        resetInactivityTimer(3500);
       }
       lastScrollY.current = currentScrollY;
     };
