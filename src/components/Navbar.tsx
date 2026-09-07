@@ -66,84 +66,36 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/60 will-change-transform">
-      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-2">
-          {/* Logo & Identity */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16 relative">
+          {/* Left spacer for perfect geometric center balance */}
+          <div className="w-10 h-10 shrink-0" />
+
+          {/* Centralized NEXUS Logo & Brand Sign in a cool blending way */}
           <div
-            className="flex items-center space-x-2.5 cursor-pointer group shrink-0 min-w-0"
+            className="flex items-center justify-center cursor-pointer group select-none transition-all duration-300"
             onClick={() => setCurrentTab('dashboard')}
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-950 flex items-center justify-center shadow-lg shadow-emerald-500/20 ring-1 ring-emerald-500/20 transition-transform group-hover:scale-105 shrink-0">
-              <NexusLogo size="sm" animated={false} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center space-x-1.5 flex-wrap">
-                <span className="font-extrabold text-lg sm:text-xl tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-emerald-200 to-teal-300 group-hover:to-amber-300 transition-all font-mono drop-shadow-sm">
-                  NEXUS
-                </span>
-                <span className="text-[9px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 font-mono font-semibold border border-amber-500/30 shadow-sm">
-                  v2.5
-                </span>
-                <span className="md:hidden text-[10px] font-bold font-mono text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-lg shadow-sm">
-                  {compositeScore}%
-                </span>
+            <div className="relative flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-amber-500/10 to-teal-500/10 border border-amber-500/25 group-hover:border-amber-400/40 shadow-lg shadow-black/50 backdrop-blur-md transition-all">
+              {/* Soft atmospheric ambient glow */}
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-amber-500/15 via-emerald-500/20 to-teal-500/15 blur-sm opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+              <div className="relative w-8 h-8 rounded-xl bg-gradient-to-br from-zinc-900 to-black flex items-center justify-center shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/25 shrink-0 group-hover:scale-105 transition-transform">
+                <NexusLogo size="xs" animated={false} />
               </div>
+              <span className="relative font-black text-lg sm:text-xl tracking-[0.22em] font-mono text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-emerald-200 to-teal-300 group-hover:to-amber-300 drop-shadow-[0_0_12px_rgba(52,211,153,0.35)]">
+                NEXUS
+              </span>
             </div>
           </div>
 
-          {/* Composite Score Badge & Mini Radar Quick view (Desktop) */}
-          <div className="hidden md:flex items-center space-x-3.5 bg-zinc-900/90 py-1.5 px-3.5 rounded-2xl border border-zinc-800 shadow-inner">
-            <div className="flex items-center space-x-2">
-              <span className="text-[11px] text-zinc-400 font-medium uppercase tracking-wider">Life Score</span>
-              <div className="flex items-baseline space-x-1">
-                <span className="text-xl font-extrabold font-mono text-emerald-400">{compositeScore}</span>
-                <span className="text-xs text-zinc-500">%</span>
-              </div>
-            </div>
-            <div className="h-4 w-px bg-zinc-800" />
-            <div className="flex items-center space-x-1.5">
-              {(Object.keys(CATEGORY_NAMES) as CategoryKey[]).map((catKey) => (
-                <div
-                  key={catKey}
-                  className={`px-2 py-0.5 rounded-lg text-[11px] font-mono border ${CATEGORY_COLORS[catKey].bg} ${CATEGORY_COLORS[catKey].text} ${CATEGORY_COLORS[catKey].border} shadow-sm`}
-                  title={`${CATEGORY_NAMES[catKey]}: ${categoryScores[catKey]}%`}
-                >
-                  {categoryScores[catKey]}%
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Export / Import & Settings */}
-          <div className="flex items-center space-x-1.5 shrink-0">
-            <button
-              onClick={handleAnonymizeClick}
-              title="Anonymize goal names and journal entries before export"
-              className="hidden sm:flex px-2.5 py-1.5 bg-indigo-950/80 hover:bg-indigo-900/90 text-indigo-300 text-xs rounded-lg font-medium border border-indigo-500/40 items-center space-x-1.5 transition-colors shadow-sm"
-            >
-              <EyeOff className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Anonymize</span>
-            </button>
-            <button
-              onClick={onExport}
-              title="Backup Data to JSON"
-              className="p-2 sm:px-2.5 sm:py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs rounded-lg font-medium border border-zinc-700 flex items-center space-x-1.5 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Export</span>
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              title="Import Data from JSON"
-              className="hidden sm:flex px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs rounded-lg font-medium border border-zinc-700 items-center space-x-1.5 transition-colors"
-            >
-              <Upload className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Import</span>
-            </button>
+          {/* Right Action: Settings Button */}
+          <div className="w-10 h-10 flex items-center justify-end shrink-0">
             <button
               onClick={() => setShowSettingsModal(true)}
               title="Settings & Data Controls"
-              className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg transition-colors border border-zinc-700 shrink-0"
+              className="w-10 h-10 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all border border-zinc-800 flex items-center justify-center active:scale-95 shadow-sm cursor-pointer"
+              aria-label="Open Settings"
             >
               <Settings className="w-4 h-4" />
             </button>

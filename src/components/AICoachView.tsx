@@ -735,80 +735,69 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-2xl shadow-amber-950/20 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-start space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 via-orange-500 to-yellow-400 text-zinc-950 font-bold flex items-center justify-center text-xl shrink-0 shadow-lg shadow-amber-950/50">
-            <Bot className="w-7 h-7" />
+    <div className="space-y-0 max-w-6xl mx-auto">
+
+      {/* ─── TOP TAB BAR ─── Full-page ChatGPT style */}
+      <div className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-2.5 flex items-center justify-between gap-3">
+        {/* Left: NEXUS wordmark */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center shrink-0 shadow-lg shadow-amber-950/40">
+            <Bot className="w-4 h-4 text-zinc-950" />
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-                NEXUS AI
-              </h1>
-              <span className="text-xs font-mono font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
-                {userConfig.userName || 'Champion'}
-              </span>
-            </div>
-            <p className="text-xs sm:text-sm text-zinc-400 font-light mt-1 max-w-2xl">
-Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blockers, and available time; category tags only monitor progress.
-            </p>
-          </div>
+          <span className="text-sm font-bold text-white tracking-tight hidden sm:block">NEXUS</span>
         </div>
 
-        {/* Tab Switcher & Actions */}
-        <div className="flex items-center space-x-2 self-start md:self-auto">
-          {onOpenPlanReview && (
-            <button
-              type="button"
-              onClick={onOpenPlanReview}
-              className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-amber-500/40 text-amber-200 hover:text-white hover:border-amber-400 flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3 h-3" />
-              Review plan
-            </button>
-          )}
+        {/* Center: Tab Pills */}
+        <div className="flex items-center bg-zinc-900/80 border border-zinc-800 rounded-xl p-1 gap-0.5 flex-1 max-w-xs mx-auto">
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${
+              activeTab === 'chat'
+                ? 'bg-amber-500 text-zinc-950 shadow-sm'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <MessageSquare className="w-3 h-3" />
+            <span>NEXUS</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('blueprint')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${
+              activeTab === 'blueprint'
+                ? 'bg-amber-500 text-zinc-950 shadow-sm'
+                : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Compass className="w-3 h-3" />
+            <span>Blueprint</span>
+          </button>
           {onRerunGoalScout && (
             <button
-              type="button"
               onClick={onRerunGoalScout}
-              className="px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-zinc-700 text-zinc-300 hover:text-white hover:border-amber-500/40 flex items-center gap-1.5"
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded-lg text-zinc-400 hover:text-amber-300 hover:bg-amber-500/10 transition-all"
             >
               <RefreshCw className="w-3 h-3" />
-              Re-run Goal Scout
+              <span>Scout</span>
             </button>
           )}
-          <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800">
-            <button
-              onClick={() => setActiveTab('blueprint')}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-                activeTab === 'blueprint'
-                  ? 'bg-amber-500 text-zinc-950 shadow-md'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Master Blueprint</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('chat')}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center space-x-1.5 ${
-                activeTab === 'chat'
-                  ? 'bg-amber-500 text-zinc-950 shadow-md'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Talk to NEXUS</span>
-            </button>
-          </div>
         </div>
+
+        {/* Right: Plan Review */}
+        {onOpenPlanReview && (
+          <button
+            type="button"
+            onClick={onOpenPlanReview}
+            className="shrink-0 p-2 text-zinc-400 hover:text-amber-300 transition-colors rounded-lg hover:bg-zinc-800/60"
+            title="Review Plan"
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* TAB 1: MASTER BLUEPRINT & TIMELINES */}
       {activeTab === 'blueprint' && (
-        <div className="space-y-6">
+        <div className="space-y-6 pt-4 px-0">
           {userConfig.adaptiveWarnings && userConfig.adaptiveWarnings.length > 0 && (
             <div className="bg-zinc-950 border border-amber-500/25 rounded-2xl p-4 space-y-2">
               <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Timeline shifts</h3>
@@ -1524,107 +1513,126 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
         </div>
       )}
 
-      {/* TAB 2: TALK TO AI ON RANDOM */}
+      {/* TAB 2: NEXUS CHAT — Full-page ChatGPT style */}
       {activeTab === 'chat' && (
-      <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-2xl p-4 sm:p-6 shadow-2xl flex flex-col h-[600px] min-h-0 ring-1 ring-amber-500/20">
+        <div className="flex flex-col bg-black" style={{ minHeight: 'calc(100vh - 56px)' }}>
+
+          {/* Offline / Error Banners */}
           {brainOffline && (
-            <div className="mb-2 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-200 shrink-0">
+            <div className="mx-4 mt-3 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 text-[11px] text-rose-200 shrink-0">
               NEXUS brain offline — on PC run <span className="font-mono text-amber-300">npm run dev</span> then{' '}
               <span className="font-mono text-amber-300">adb reverse tcp:3000 tcp:3000</span>
             </div>
           )}
-          <div className="shrink-0">
+          <div className="shrink-0 px-4 pt-2">
             <AiErrorPanel error={lastAiError} onDismiss={() => setLastAiError(null)} />
           </div>
-          {/* Messages Container */}
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1 custom-scrollbar bg-zinc-950/50 p-4 rounded-xl border border-zinc-800/80">
+
+          {/* ─── Messages Canvas ─── */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-4 space-y-5">
             {chatMessages.map((msg) => {
               const isAI = msg.sender === 'ai';
-
               return (
                 <div
                   key={msg.id}
-                  className={`flex items-start space-x-3 ${isAI ? 'justify-start' : 'justify-end'}`}
+                  className={`flex ${isAI ? 'justify-start items-start gap-2.5' : 'justify-end'}`}
                 >
+                  {/* AI: small avatar */}
                   {isAI && (
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center text-sm shrink-0 mt-0.5 shadow-sm">
-                      <Bot className="w-4 h-4" />
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center shrink-0 mt-0.5 shadow-md shadow-amber-950/40">
+                      <Bot className="w-3.5 h-3.5 text-zinc-950" />
                     </div>
                   )}
 
-                  <div
-                    className={`max-w-[80%] px-4 py-3 rounded-2xl text-xs leading-relaxed ${
-                      isAI
-                        ? 'bg-zinc-900/90 border border-amber-500/20 text-zinc-100 rounded-tl-sm shadow-md'
-                        : 'bg-amber-500 text-zinc-950 font-medium rounded-tr-sm shadow-md shadow-amber-950/30'
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
-                    <span
-                      className={`text-[9px] font-mono block text-right mt-1 opacity-60 ${
-                        isAI ? 'text-zinc-500' : 'text-zinc-900'
-                      }`}
-                    >
-                      {msg.timestamp}
-                    </span>
+                  <div className={`${isAI ? 'flex-1 max-w-[88%]' : 'max-w-[78%]'}`}>
+                    {/* AI: text directly on dark canvas, no bubble */}
+                    {isAI ? (
+                      <div className="space-y-0.5">
+                        <p className="text-sm text-zinc-100 leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                        <span className="text-[9px] font-mono text-zinc-600 block mt-1">{msg.timestamp}</span>
+                      </div>
+                    ) : (
+                      /* User: amber rounded pill, right-aligned */
+                      <div className="bg-amber-500 text-zinc-950 px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-md shadow-amber-950/30 ml-auto">
+                        <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                        <span className="text-[9px] font-mono text-zinc-800 block text-right mt-0.5 opacity-70">{msg.timestamp}</span>
+                      </div>
+                    )}
                   </div>
-
-                  {!isAI && (
-                    <div className="w-8 h-8 rounded-xl bg-amber-500 text-zinc-950 flex items-center justify-center text-sm shrink-0 mt-0.5 font-bold shadow-sm">
-                      <User className="w-4 h-4" />
-                    </div>
-                  )}
                 </div>
               );
             })}
 
+            {/* Typing indicator */}
             {isTyping && (
-              <div className="flex items-center space-x-2 text-zinc-500 text-xs py-1">
-                <Bot className="w-4 h-4 text-amber-400 animate-bounce" />
-                <span className="italic">NEXUS is typing...</span>
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center shrink-0 shadow-md shadow-amber-950/40">
+                  <Bot className="w-3.5 h-3.5 text-zinc-950" />
+                </div>
+                <div className="flex items-center gap-1 px-2 py-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
             )}
 
             <div ref={chatEndRef} />
           </div>
 
-
-
-          {/* Input Bar */}
-          <div className="pt-2 space-y-2 shrink-0">
-            <p className="text-[10px] text-zinc-500 leading-snug">
-              First AI reply can take about a minute if the hosted server is waking up.
-            </p>
-            <button
-              type="button"
-              onClick={() => handleSendMessage('What should I do next based on my goals, journal, and current momentum?')}
-              disabled={isTyping}
-              className="w-full sm:w-auto px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/25 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
-            >
-              <Target className="w-3.5 h-3.5" />
-              <span>What should I do next?</span>
-            </button>
-            <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Type your message..."
-              className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/60"
-            />
-            <button
-              onClick={() => handleSendMessage()}
-              disabled={!inputText.trim() || isTyping}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-zinc-950 font-bold text-xs rounded-xl transition-all shadow-md cursor-pointer flex items-center space-x-1"
-            >
-              <Send className="w-4 h-4" />
-              <span>Send</span>
-            </button>
+          {/* ─── Input Bar ─── */}
+          <div className="shrink-0 border-t border-zinc-800/60 bg-black px-4 pt-3 pb-4 space-y-2">
+            {/* Quick-action chip */}
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+              <button
+                type="button"
+                onClick={() => handleSendMessage('What should I do next based on my goals, journal, and current momentum?')}
+                disabled={isTyping}
+                className="shrink-0 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-amber-500/50 text-zinc-300 hover:text-amber-300 rounded-full text-[11px] font-semibold flex items-center gap-1.5 transition-all disabled:opacity-40"
+              >
+                <Target className="w-3 h-3 text-amber-400" />
+                <span>What should I do next?</span>
+              </button>
             </div>
+
+            {/* Text row */}
+            <div className="flex items-end gap-2">
+              <div className="flex-1 bg-zinc-900 border border-zinc-700 focus-within:border-amber-500/60 rounded-2xl px-4 py-3 flex items-end gap-2 transition-colors">
+                <textarea
+                  value={inputText}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder="Message NEXUS..."
+                  rows={1}
+                  className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none resize-none leading-relaxed max-h-[120px] overflow-y-auto"
+                  style={{ height: '24px' }}
+                />
+              </div>
+              <button
+                onClick={() => handleSendMessage()}
+                disabled={!inputText.trim() || isTyping}
+                className="w-10 h-10 rounded-full bg-amber-500 hover:bg-amber-400 disabled:opacity-30 disabled:cursor-not-allowed text-zinc-950 flex items-center justify-center transition-all shadow-lg shadow-amber-950/40 shrink-0"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-600 text-center leading-snug">
+              First reply may take ~1 min if server is waking up · Shift+Enter for new line
+            </p>
           </div>
         </div>
       )}
+
+
 
       {/* ─── MODAL: Add / Edit Major Lifetime Mega Goal ─── */}
       {showMegaGoalModal && editingMegaGoal && (

@@ -394,31 +394,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         {/* Radar Chart Section (7 cols) */}
         <div className="lg:col-span-7 bg-gradient-to-br from-zinc-950/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-amber-500/25 hover:border-amber-400/40 rounded-2xl p-5 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between space-y-4 transition-all duration-300">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
-            <div>
-              <h2 className="text-base font-bold text-white tracking-tight flex items-center space-x-2">
+          <div className="flex items-start sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center space-x-2">
                 <span>Category Balance Matrix</span>
               </h2>
-              <p className="text-xs text-zinc-400 font-light mt-0.5">
+              <p className="text-[11px] sm:text-xs text-zinc-400 font-light mt-0.5 leading-snug">
                 5-Axis balance analysis based on daily habit completions & decay
               </p>
             </div>
             <motion.div
               initial={{ scale: 1 }}
-              animate={{ scale: [1, 1.03, 1] }}
+              animate={{ scale: [1, 1.02, 1] }}
               transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-              className="relative flex items-center space-x-2 bg-emerald-500/10 px-3.5 py-1.5 rounded-xl border border-emerald-500/30 shadow-sm shadow-emerald-500/10 overflow-hidden group"
+              className="relative flex items-center gap-2 bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-teal-500/15 px-3 py-1.5 rounded-xl border border-emerald-500/35 shadow-sm shadow-emerald-500/10 overflow-hidden shrink-0 whitespace-nowrap self-start sm:self-center"
             >
               {/* Subtle pulsing background aura */}
               <div className="absolute -inset-1 rounded-xl bg-emerald-500/15 blur-sm animate-pulse pointer-events-none" />
-              <span className="relative z-10 text-xs text-emerald-400/90 font-medium uppercase tracking-wider flex items-center space-x-1.5">
-                <span className="relative flex h-2 w-2 mr-0.5">
+              <div className="relative z-10 flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
-                <span>NEXUS Score</span>
-              </span>
-              <span className="relative z-10 text-lg font-mono font-extrabold text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.35)]">
+                <span className="text-[10px] sm:text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 whitespace-nowrap">
+                  NEXUS Score
+                </span>
+              </div>
+              <div className="relative z-10 h-3.5 w-px bg-emerald-500/30" />
+              <span className="relative z-10 text-base sm:text-lg font-mono font-extrabold text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.4)] whitespace-nowrap">
                 {scoreData.composite}%
               </span>
             </motion.div>

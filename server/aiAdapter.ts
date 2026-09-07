@@ -263,10 +263,12 @@ function openRouterVisionModel() {
 }
 
 function groqModel() {
-  return process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+  // deepseek-r1-distill-llama-70b: reasoning-capable model, smarter responses with chain-of-thought
+  return process.env.GROQ_MODEL || 'deepseek-r1-distill-llama-70b';
 }
 function groqHighStakesModel() {
-  return process.env.GROQ_HIGHSTAKES_MODEL || 'openai/gpt-oss-120b';
+  // Use compound-beta for blueprint synthesis (multi-step reasoning + tool use)
+  return process.env.GROQ_HIGHSTAKES_MODEL || 'compound-beta';
 }
 function groqVisionModel() {
   return process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
