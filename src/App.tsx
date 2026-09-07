@@ -1064,6 +1064,9 @@ export default function App() {
             dailyLogs={dailyLogs}
             journals={journals}
             currentScore={scoreData.composite}
+            todayStr={todayStr}
+            plannedTasks={plannedTasks}
+            milestones={milestones}
           />
         )}
 

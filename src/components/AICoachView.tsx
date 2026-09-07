@@ -28,7 +28,7 @@ import {
   Milestone as MilestoneIcon,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { UserConfig, AIChatMessage, Goal, DailyGoalLog, DailyJournal, CATEGORY_NAMES, CATEGORY_COLORS, LifetimeMegaGoal, CategoryKey } from '../types';
+import { UserConfig, AIChatMessage, Goal, DailyGoalLog, DailyJournal, CATEGORY_NAMES, CATEGORY_COLORS, LifetimeMegaGoal, CategoryKey, Milestone, PlannedTask } from '../types';
 import { aiClient } from '../services/aiClient';
 import { calculateWillpowerAnalytics } from '../utils/willpowerAnalytics';
 import { apiOfflineMessage, smartOfflineReply } from '../utils/chatFallback';
@@ -39,6 +39,8 @@ import { buildAdaptiveTimeline } from '../utils/timelinePlanner';
 import { ensureNexusPersona } from '../utils/nexusPersona';
 import { mergeIdentity } from '../utils/userIdentity';
 import { mapToPassiveCategory } from '../utils/blueprintNormalizer';
+import { GoalPathwayModal } from './GoalPathwayModal';
+import { getGoalPathway } from '../utils/goalPathways';
 
 interface AICoachViewProps {
   userConfig: UserConfig;
@@ -53,6 +55,9 @@ interface AICoachViewProps {
   dailyLogs: DailyGoalLog[];
   journals: DailyJournal[];
   currentScore?: number;
+  todayStr?: string;
+  plannedTasks?: PlannedTask[];
+  milestones?: Milestone[];
 }
 
 function parseAndExecuteAction(
@@ -222,6 +227,9 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
   dailyLogs,
   journals,
   currentScore,
+  todayStr = new Date().toISOString().split('T')[0],
+  plannedTasks = [],
+  milestones = [],
 }) => {
   const [activeTab, setActiveTab] = useState<'blueprint' | 'chat'>('chat');
   const [chatMessages, setChatMessages] = useState<AIChatMessage[]>(
@@ -243,6 +251,38 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
   const [addedGoalNames, setAddedGoalNames] = useState<Set<string>>(
     new Set(existingGoals.map((g) => g.name.toLowerCase()))
   );
+
+  // Goal Execution Pathway Modal State (for all Master Blueprint & Planned Goals)
+  const [activePathwayGoal, setActivePathwayGoal] = useState<Goal | null>(null);
+
+  const handleOpenGoalPathway = (goalLike: any) => {
+    if (!goalLike) return;
+    const nameToMatch = String(goalLike.name || goalLike.title || '').trim().toLowerCase();
+    const live = existingGoals.find(
+      (g) => (goalLike.id && g.id === goalLike.id) || g.name.trim().toLowerCase() === nameToMatch
+    );
+    if (live) {
+      setActivePathwayGoal(live);
+      return;
+    }
+
+    const synthesized: Goal = {
+      id: goalLike.id || `blueprint-${nameToMatch.replace(/[^a-z0-9]+/g, '-') || 'goal'}`,
+      name: goalLike.name || goalLike.title || 'Blueprint Goal',
+      description: goalLike.description || 'Master Blueprint strategic goal',
+      frequency: (goalLike.targetFrequency === 'weekly' || goalLike.frequency === 'weekly') ? 'weekly' : 'daily',
+      category: (goalLike.category as CategoryKey) || 'smarts',
+      basePoints: goalLike.basePoints || 10,
+      reminderTime: goalLike.reminderTime || '08:00',
+      createdAt: goalLike.createdAt || new Date().toISOString(),
+      likelihoodPercent: goalLike.chanceOfAchievement || 85,
+      effects: goalLike.effects || [{ category: (goalLike.category as CategoryKey) || 'smarts', weight: 4 }],
+      isLifePathAligned: true,
+      isCognitiveTraining: goalLike.category === 'smarts',
+      timelineSummary: goalLike.description || goalLike.timelineSummary || 'Master Blueprint strategic goal',
+    };
+    setActivePathwayGoal(synthesized);
+  };
 
   // Mega Goals & Planned Goals Edit State
   const [showMegaGoalModal, setShowMegaGoalModal] = useState(false);
@@ -1015,7 +1055,8 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                 {(blueprint?.lifetimeMegaGoals || (userConfig.userIdentity?.lifeGoals || []).map((g) => ({ title: g, description: 'Major life target', timelineEstimate: 'Long-term', category: 'life' }))).map((mg: LifetimeMegaGoal, idx: number) => (
                   <div
                     key={idx}
-                    className="bg-zinc-900/90 border border-amber-500/20 hover:border-amber-500/40 p-4 rounded-xl space-y-2.5 flex flex-col justify-between transition-all group"
+                    onClick={() => handleOpenGoalPathway(mg)}
+                    className="bg-zinc-900/90 border border-amber-500/20 hover:border-amber-500/50 p-4 rounded-xl space-y-2.5 flex flex-col justify-between transition-all group cursor-pointer hover:shadow-lg hover:shadow-amber-500/10"
                   >
                     <div className="space-y-1.5">
                       <div className="flex items-start justify-between gap-2">
@@ -1025,7 +1066,10 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                         <div className="flex items-center space-x-1 opacity-80 group-hover:opacity-100 transition-opacity">
                           <button
                             type="button"
-                            onClick={() => handleOpenEditMegaGoal(mg, idx)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditMegaGoal(mg, idx);
+                            }}
                             className="p-1 text-zinc-400 hover:text-amber-300 transition-colors"
                             title="Edit Major Goal"
                           >
@@ -1033,7 +1077,10 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteMegaGoal(idx)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteMegaGoal(idx);
+                            }}
                             className="p-1 text-zinc-400 hover:text-rose-400 transition-colors"
                             title="Remove"
                           >
@@ -1041,18 +1088,34 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                           </button>
                         </div>
                       </div>
-                      <h4 className="text-sm font-bold text-white tracking-tight">{mg.title}</h4>
+                      <h4 className="text-sm font-bold text-white tracking-tight group-hover:text-amber-300 transition-colors">{mg.title}</h4>
                       {mg.description && (
                         <p className="text-xs text-zinc-300 font-light leading-relaxed">
                           {mg.description}
                         </p>
                       )}
                     </div>
-                    {mg.category && (
-                      <div className="text-[10px] text-zinc-500 font-mono">
-                        Domain: <span className="text-zinc-300">{mg.category}</span>
-                      </div>
-                    )}
+                    <div className="space-y-2 pt-1 border-t border-zinc-800/60">
+                      {mg.category && (
+                        <div className="text-[10px] text-zinc-500 font-mono">
+                          Domain: <span className="text-zinc-300">{mg.category}</span>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenGoalPathway(mg);
+                        }}
+                        className="w-full py-1.5 px-2.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 hover:border-amber-400 text-amber-300 text-[11px] font-semibold flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Compass className="w-3.5 h-3.5 text-amber-400" />
+                          <span>View AI Roadmap & Steps</span>
+                        </span>
+                        <ArrowRight className="w-3 h-3 text-amber-400" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1085,20 +1148,27 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                   const live = existingGoals.find((g) => g.name.toLowerCase() === String(pg.name || '').toLowerCase());
                   const chance = live?.likelihoodPercent || pg.chanceOfAchievement || 80;
                   return (
-                    <div key={idx} className="bg-zinc-900/80 border border-zinc-800 p-3.5 rounded-xl space-y-2">
+                    <div
+                      key={idx}
+                      onClick={() => handleOpenGoalPathway(pg)}
+                      className="bg-zinc-900/80 hover:bg-zinc-900 border border-zinc-800 hover:border-amber-500/40 p-3.5 rounded-xl space-y-2 cursor-pointer transition-all group"
+                    >
                       <div className="flex justify-between items-start">
                         <div>
                           <span className="text-[9px] font-mono text-amber-400 font-bold uppercase">{pg.category}</span>
-                          <h4 className="text-xs font-bold text-white line-clamp-1">{pg.name}</h4>
+                          <h4 className="text-xs font-bold text-white line-clamp-1 group-hover:text-amber-300 transition-colors">{pg.name}</h4>
                         </div>
                         <span className="text-sm font-bold font-mono text-emerald-400">{chance}%</span>
                       </div>
                       <div className="w-full bg-zinc-950 rounded-full h-1.5 overflow-hidden">
                         <div className="bg-amber-500 h-full rounded-full" style={{ width: `${chance}%` }} />
                       </div>
-                      <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
+                      <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
                         <span>Scope: {plannedTimelineLabel(pg)}</span>
-                        <span className="text-amber-300">Strain: {pg.willpowerStrain || 'Low'}</span>
+                        <span className="text-amber-300 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                          <span>Roadmap</span>
+                          <ArrowRight className="w-2.5 h-2.5" />
+                        </span>
                       </div>
                     </div>
                   );
@@ -1107,20 +1177,27 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
             ) : analytics.goalLikelihoods.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {analytics.goalLikelihoods.slice(0, 4).map((gl) => (
-                  <div key={gl.goalId} className="bg-zinc-900/80 border border-zinc-800 p-3.5 rounded-xl space-y-2">
+                  <div
+                    key={gl.goalId}
+                    onClick={() => handleOpenGoalPathway({ id: gl.goalId, name: gl.goalName, category: gl.category })}
+                    className="bg-zinc-900/80 hover:bg-zinc-900 border border-zinc-800 hover:border-amber-500/40 p-3.5 rounded-xl space-y-2 cursor-pointer transition-all group"
+                  >
                     <div className="flex justify-between items-start">
                       <div>
                         <span className="text-[9px] font-mono text-amber-400 font-bold">{gl.category}</span>
-                        <h4 className="text-xs font-bold text-white line-clamp-1">{gl.goalName}</h4>
+                        <h4 className="text-xs font-bold text-white line-clamp-1 group-hover:text-amber-300 transition-colors">{gl.goalName}</h4>
                       </div>
                       <span className="text-sm font-bold font-mono text-emerald-400">{gl.likelihoodPercent}%</span>
                     </div>
                     <div className="w-full bg-zinc-950 rounded-full h-1.5 overflow-hidden">
                       <div className="bg-amber-500 h-full rounded-full" style={{ width: `${gl.likelihoodPercent}%` }} />
                     </div>
-                    <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
+                    <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono">
                       <span>Est. Mastery: ~{gl.estimatedMasteryDays}d</span>
-                      <span className="text-amber-300">Strain: {gl.willpowerStrain}</span>
+                      <span className="text-amber-300 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                        <span>Roadmap</span>
+                        <ArrowRight className="w-2.5 h-2.5" />
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -1163,10 +1240,28 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                   const isAlreadyAdded = addedGoalNames.has(planned.name.toLowerCase());
                   const live = existingGoals.find((g) => g.name.toLowerCase() === String(planned.name || '').toLowerCase());
                   const chance = live?.likelihoodPercent || planned.chanceOfAchievement || 80;
+                  const goalForPathway: Goal = live || {
+                    id: planned.id || `planned-${String(planned.name || 'goal').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+                    name: planned.name,
+                    description: planned.description || 'Master Blueprint planned goal',
+                    frequency: (planned.targetFrequency === 'weekly' || planned.frequency === 'weekly') ? 'weekly' : 'daily',
+                    category: (planned.category as CategoryKey) || 'smarts',
+                    basePoints: planned.basePoints || 10,
+                    reminderTime: planned.reminderTime || '08:00',
+                    createdAt: new Date().toISOString(),
+                    likelihoodPercent: chance,
+                    effects: planned.effects || [{ category: (planned.category as CategoryKey) || 'smarts', weight: 4 }],
+                    isLifePathAligned: true,
+                    isCognitiveTraining: planned.category === 'smarts',
+                    timelineSummary: planned.description || 'Master Blueprint planned goal',
+                  };
+                  const pathway = getGoalPathway(goalForPathway, plannedTasks, milestones, dailyLogs, userConfig, todayStr);
+
                   return (
                     <div
                       key={idx}
-                      className="bg-zinc-950/90 border border-amber-500/25 rounded-2xl p-5 shadow-xl space-y-4 hover:border-amber-400/40 transition-all flex flex-col justify-between"
+                      onClick={() => handleOpenGoalPathway(planned)}
+                      className="bg-zinc-950/90 border border-amber-500/25 rounded-2xl p-5 shadow-xl space-y-4 hover:border-amber-400 hover:shadow-2xl hover:shadow-amber-500/10 transition-all flex flex-col justify-between cursor-pointer group"
                     >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-2">
@@ -1174,7 +1269,7 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                             <span className={`text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full border ${catColor.bg} ${catColor.text} ${catColor.border}`}>
                               Tracking: {CATEGORY_NAMES[planned.category as keyof typeof CATEGORY_NAMES] || planned.category}
                             </span>
-                            <h4 className="text-base font-bold text-white mt-1.5">{planned.name}</h4>
+                            <h4 className="text-base font-bold text-white mt-1.5 group-hover:text-amber-300 transition-colors">{planned.name}</h4>
                             {planned.autoAdded && (
                               <span className="inline-block mt-1 text-[10px] font-mono text-violet-300 bg-violet-500/10 border border-violet-500/25 px-2 py-0.5 rounded-full">
                                 NEXUS added
@@ -1191,7 +1286,10 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                               )}
                               <button
                                 type="button"
-                                onClick={() => handleOpenEditPlannedGoal(planned, idx)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditPlannedGoal(planned, idx);
+                                }}
                                 className="p-1 text-zinc-400 hover:text-amber-300 transition-colors"
                                 title="Edit Goal"
                               >
@@ -1199,7 +1297,10 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleDeletePlannedGoal(idx)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePlannedGoal(idx);
+                                }}
                                 className="p-1 text-zinc-400 hover:text-rose-400 transition-colors"
                                 title="Remove Goal"
                               >
@@ -1215,6 +1316,51 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
                         <p className="text-xs text-zinc-300 font-light leading-relaxed bg-zinc-900/60 p-3 rounded-xl border border-zinc-800/80">
                           {planned.description}
                         </p>
+
+                        {/* Interactive Tomorrow Step & AI Progression Banner */}
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenGoalPathway(planned);
+                          }}
+                          className="bg-gradient-to-br from-amber-500/20 via-orange-500/15 to-amber-500/5 hover:from-amber-500/30 hover:via-orange-500/25 border border-amber-500/40 hover:border-amber-400 p-3.5 rounded-xl transition-all cursor-pointer space-y-2 group/step shadow-sm ring-1 ring-amber-500/20"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                              <Compass className="w-3.5 h-3.5 text-amber-400 group-hover/step:rotate-45 transition-transform" />
+                              <span>AI Progression & Tomorrow's Step</span>
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-amber-300 flex items-center gap-1 group-hover/step:translate-x-1 transition-transform">
+                              <span>Tap for Roadmap</span>
+                              <ArrowRight className="w-3 h-3 text-amber-400" />
+                            </span>
+                          </div>
+
+                          <div className="bg-zinc-900/90 border border-amber-500/20 p-2.5 rounded-lg space-y-1">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-white flex items-center gap-1.5">
+                                <Calendar className="w-3 h-3 text-amber-400" />
+                                <span>Tomorrow's Expected Step:</span>
+                              </span>
+                              <span className="text-[10px] font-mono text-amber-300 font-semibold">~{pathway.tomorrowTask.durationMinutes}m</span>
+                            </div>
+                            <p className="text-xs text-amber-200/95 font-medium leading-snug">
+                              {pathway.tomorrowTask.title}
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-0.5 text-[10px] font-mono">
+                            <div className="bg-black/30 px-2 py-1 rounded border border-zinc-800/80">
+                              <span className="text-zinc-400 block text-[9px] uppercase">Week Target:</span>
+                              <span className="text-emerald-300 font-semibold truncate block">{pathway.horizons.thisWeek.title}</span>
+                            </div>
+                            <div className="bg-black/30 px-2 py-1 rounded border border-zinc-800/80">
+                              <span className="text-zinc-400 block text-[9px] uppercase">Month Target:</span>
+                              <span className="text-amber-300 font-semibold truncate block">{pathway.horizons.thisMonth.title}</span>
+                            </div>
+                          </div>
+                        </div>
+
                         {planned.autoAddedReason && (
                           <p className="text-[11px] text-violet-300/90 font-light leading-relaxed bg-violet-500/5 p-2.5 rounded-lg border border-violet-500/20">
                             {planned.autoAddedReason}
@@ -1266,7 +1412,10 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
 
                       <div className="pt-2">
                         <button
-                          onClick={() => handleAddPlannedGoalToActive(planned)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddPlannedGoalToActive(planned);
+                          }}
                           disabled={isAlreadyAdded}
                           className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 shadow-md ${
                             isAlreadyAdded
@@ -1683,6 +1832,20 @@ Daily chat + your saved roadmap. Goal Scout uses your ambition, baseline, blocke
             </div>
           </div>
         </div>
+      )}
+
+      {/* ─── MODAL: Goal Execution Pathway & Multi-Horizon Roadmap ─── */}
+      {activePathwayGoal && (
+        <GoalPathwayModal
+          goal={activePathwayGoal}
+          plannedTasks={plannedTasks}
+          milestones={milestones}
+          dailyLogs={dailyLogs}
+          userConfig={userConfig}
+          todayStr={todayStr}
+          onClose={() => setActivePathwayGoal(null)}
+          onToggleGoal={onToggleGoal || (() => {})}
+        />
       )}
     </div>
   );
