@@ -253,22 +253,21 @@ const KILO_API_URL = 'https://api.kilo.ai/api/gateway/chat/completions';
 const NVIDIA_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
 function openRouterModel() {
-  return process.env.OPENROUTER_MODEL || 'qwen/qwen3-235b-a22b';
+  return process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free';
 }
 function openRouterHighStakesModel() {
-  return process.env.OPENROUTER_HIGHSTAKES_MODEL || 'deepseek/deepseek-r1:free';
+  return process.env.OPENROUTER_HIGHSTAKES_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free';
 }
 function openRouterVisionModel() {
   return process.env.OPENROUTER_VISION_MODEL || 'nvidia/nemotron-nano-12b-v2-vl:free';
 }
 
 function groqModel() {
-  // deepseek-r1-distill-llama-70b: reasoning-capable model, smarter responses with chain-of-thought
-  return process.env.GROQ_MODEL || 'deepseek-r1-distill-llama-70b';
+  // Flagship 120B parameter model on Groq — fast & high reasoning capability
+  return process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 }
 function groqHighStakesModel() {
-  // Use compound-beta for blueprint synthesis (multi-step reasoning + tool use)
-  return process.env.GROQ_HIGHSTAKES_MODEL || 'compound-beta';
+  return process.env.GROQ_HIGHSTAKES_MODEL || 'openai/gpt-oss-120b';
 }
 function groqVisionModel() {
   return process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
