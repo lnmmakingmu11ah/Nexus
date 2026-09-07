@@ -26,6 +26,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Milestone as MilestoneIcon,
+  ChevronLeft,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { UserConfig, AIChatMessage, Goal, DailyGoalLog, DailyJournal, CATEGORY_NAMES, CATEGORY_COLORS, LifetimeMegaGoal, CategoryKey, Milestone, PlannedTask } from '../types';
@@ -739,13 +740,16 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
       {/* ─── TOP TAB BAR ─── Full-page ChatGPT style */}
       <div className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-2.5 flex items-center justify-between gap-3">
-        {/* Left: NEXUS wordmark */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center shrink-0 shadow-lg shadow-amber-950/40">
-            <Bot className="w-4 h-4 text-zinc-950" />
-          </div>
-          <span className="text-sm font-bold text-white tracking-tight hidden sm:block">NEXUS</span>
-        </div>
+        {/* Left: Return to Home / Exit Chat button */}
+        <button
+          type="button"
+          onClick={() => onNavigateTab ? onNavigateTab('dashboard') : null}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-500/40 text-zinc-300 hover:text-white transition-all shrink-0 cursor-pointer active:scale-95 shadow-sm"
+          title="Return to Home"
+        >
+          <ChevronLeft className="w-4 h-4 text-amber-400" />
+          <span className="text-xs font-semibold">Home</span>
+        </button>
 
         {/* Center: Tab Pills */}
         <div className="flex items-center bg-zinc-900/80 border border-zinc-800 rounded-xl p-1 gap-0.5 flex-1 max-w-xs mx-auto">

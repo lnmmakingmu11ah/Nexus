@@ -1314,8 +1314,10 @@ export default function App() {
         />
       )}
 
-      {/* Floating Translucent Mobile Navigation Bar */}
-      <FloatingBottomNav currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      {/* Floating Translucent Mobile Navigation Bar — hidden on chatbox so it never blocks the chat input */}
+      {currentTab !== 'aicoach' && (
+        <FloatingBottomNav currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      )}
     </div>
   );
 }

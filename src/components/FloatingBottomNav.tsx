@@ -60,19 +60,10 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
       lastScrollY.current = currentScrollY;
     };
 
-    const handleUserInteraction = () => {
-      setIsVisible(true);
-      resetInactivityTimer(3500);
-    };
-
     window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('touchstart', handleUserInteraction, { passive: true });
-    window.addEventListener('click', handleUserInteraction, { passive: true });
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('touchstart', handleUserInteraction);
-      window.removeEventListener('click', handleUserInteraction);
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     };
   }, []);
