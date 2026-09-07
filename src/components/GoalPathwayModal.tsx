@@ -168,6 +168,103 @@ export const GoalPathwayModal: React.FC<GoalPathwayModalProps> = ({
           </div>
         </div>
 
+        {/* 7-Day Sequential Execution Plan */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-white font-bold text-xs uppercase tracking-wider">
+              <Calendar className="w-4 h-4 text-cyan-400" />
+              <span>7-Day Sequential Execution Plan</span>
+            </div>
+            <span className="text-[10px] font-mono text-zinc-400">
+              Concrete daily actions (Days 1–7)
+            </span>
+          </div>
+
+          <div className="space-y-2 max-h-72 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-700">
+            {pathway.dailyPlanItems && pathway.dailyPlanItems.map((item, idx) => {
+              const currentDayIndex = pathway.adaptive.currentStreak % (pathway.dailyPlanItems.length || 7);
+              const isToday = idx === currentDayIndex;
+              const isPast = idx < currentDayIndex;
+              return (
+                <div
+                  key={item.day}
+                  className={`p-3.5 rounded-xl border transition-all ${
+                    isToday
+                      ? 'bg-amber-500/10 border-amber-500/40 ring-1 ring-amber-500/30 shadow-md shadow-amber-500/5'
+                      : isPast
+                      ? 'bg-zinc-900/40 border-emerald-500/20 opacity-80'
+                      : 'bg-zinc-900/60 border-zinc-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${
+                        isToday
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : isPast
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                          : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                      }`}>
+                        Day {item.day} {isToday ? '• Today' : isPast ? '• Completed' : ''}
+                      </span>
+                      <h5 className="text-xs font-bold text-white">
+                        {item.title}
+                      </h5>
+                    </div>
+                    <span className="text-[10px] font-mono text-zinc-400 shrink-0">
+                      ~{item.durationMinutes} min
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-zinc-300/90 font-light leading-relaxed pl-0.5">
+                    {item.description}
+                  </p>
+
+                  {item.rationale && (
+                    <div className="mt-2 pt-2 border-t border-zinc-800/60 flex items-start gap-1.5 text-[10px] text-amber-300/80 font-light">
+                      <ArrowRight className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                      <span>{item.rationale}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 4-Week Progression Roadmap */}
+        {pathway.weeklyFocus && pathway.weeklyFocus.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-white font-bold text-xs uppercase tracking-wider">
+                <Target className="w-4 h-4 text-emerald-400" />
+                <span>4-Week Progression Roadmap</span>
+              </div>
+              <span className="text-[10px] font-mono text-zinc-400">
+                Phase 1 arc & milestones
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {pathway.weeklyFocus.map((wf) => (
+                <div key={wf.week} className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-mono font-bold uppercase text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                      Week {wf.week}
+                    </span>
+                    <span className="text-[9px] font-mono text-zinc-500">Core Focus</span>
+                  </div>
+                  <h5 className="text-xs font-bold text-zinc-100">{wf.theme}</h5>
+                  <p className="text-[10px] text-zinc-400 leading-snug">{wf.keyAction}</p>
+                  <p className="text-[10px] text-emerald-300 font-mono pt-1 border-t border-zinc-800/60">
+                    🎯 {wf.successCriteria}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 3. Multi-Horizon Progression Stepper (Week, Month, Year/Mastery) */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">

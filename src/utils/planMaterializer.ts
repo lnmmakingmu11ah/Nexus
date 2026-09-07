@@ -12,7 +12,7 @@ import {
   UserConfig,
 } from '../types';
 import { matchGoalByName, mapToPassiveCategory } from './blueprintNormalizer';
-import { buildAdaptiveTimeline, buildTimelineMilestones } from './timelinePlanner';
+import { buildAdaptiveTimeline, buildTimelineMilestones, buildSmartDailyPlan, buildSmartWeeklyFocus, buildSmartMonthlyMilestones } from './timelinePlanner';
 import { getInitialTaskParams, computeEngagementTier } from './zeroToHero';
 import { applyDailyCapToGoals, capFromProfile } from './dailyCap';
 
@@ -77,6 +77,15 @@ export function materializeBlueprintPlan(
       estimatedDaysToMastery: pg.estimatedDaysToMastery || adaptive.estimatedDaysToMastery,
       likelihoodPercent: pg.chanceOfAchievement || (tier === 'struggling' ? 55 : tier === 'disciplined' ? 78 : 65),
       adaptiveTimelineUpdatedAt: new Date().toISOString(),
+      dailyPlanItems: Array.isArray((pg as any).dailyPlanItems) && (pg as any).dailyPlanItems.length >= 3
+        ? (pg as any).dailyPlanItems
+        : buildSmartDailyPlan(pg.name || `Goal ${idx + 1}`, Boolean(partialConfig.userIdentity?.primaryBlockers?.length || partialConfig.userIdentity?.setbacks?.length)),
+      weeklyFocus: Array.isArray((pg as any).weeklyFocus) && (pg as any).weeklyFocus.length >= 2
+        ? (pg as any).weeklyFocus
+        : buildSmartWeeklyFocus(pg.name || `Goal ${idx + 1}`),
+      monthlyMilestone: Array.isArray((pg as any).monthlyMilestone) && (pg as any).monthlyMilestone.length >= 2
+        ? (pg as any).monthlyMilestone
+        : buildSmartMonthlyMilestones(pg.name || `Goal ${idx + 1}`),
     };
   });
 
@@ -130,14 +139,19 @@ export function materializeBlueprintPlan(
       const date = new Date();
       date.setDate(date.getDate() + d);
       const ds = date.toISOString().split('T')[0];
+      const planItem = goal.dailyPlanItems?.[d % (goal.dailyPlanItems.length || 7)];
+      const taskTitle = planItem?.title || goal.name;
+      const taskDescription = planItem?.description || goal.description;
+      const durationMinutes = planItem?.durationMinutes || taskParams.durationMinutes;
+
       newTasks.push({
         id: `task-${goal.id}-${d}-${ts}`,
         milestoneId: ms.id,
         goalId: goal.id,
-        title: goal.name,
-        description: goal.description,
+        title: taskTitle,
+        description: taskDescription,
         scheduledDate: ds,
-        durationMinutes: taskParams.durationMinutes,
+        durationMinutes,
         hardness: taskParams.hardness,
         isRecurring: true,
         recurrencePattern: 'daily',

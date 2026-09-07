@@ -41,6 +41,25 @@ export interface Goal {
   estimatedDaysToMastery?: number;
   likelihoodPercent?: number;
   adaptiveTimelineUpdatedAt?: string;
+  // AI-generated actionable plan — unique per goal (never generic templates)
+  dailyPlanItems?: {
+    day: number;              // 1-based (Day 1, Day 2 … Day 7)
+    title: string;            // specific named action e.g. "Read Rich Dad Poor Dad Ch.1-3"
+    description: string;      // why this specific action + what to focus on
+    durationMinutes: number;
+    rationale: string;        // how today's action enables tomorrow's
+  }[];
+  weeklyFocus?: {
+    week: number;             // 1-based
+    theme: string;            // e.g. "Investment Fundamentals"
+    keyAction: string;        // concrete weekly deliverable
+    successCriteria: string;  // measurable output
+  }[];
+  monthlyMilestone?: {
+    month: number;
+    milestone: string;        // e.g. "Open a brokerage account & invest first $50"
+    measurableOutput: string; // what proves this month succeeded
+  }[];
 }
 
 export interface DailyGoalLog {

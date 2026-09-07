@@ -66,7 +66,7 @@ import { calculateScoresForDate, calculateGoalStreak } from './utils/scoring';
 import { validateGoalDrafts } from './utils/planValidator';
 import { fallbackGoalDraft, fallbackMilestones, fallbackTask } from './utils/planFallbacks';
 import { detectOverlaps, buildDependencyGraph } from './utils/dependencyGraph';
-import { buildAdaptiveTimeline, buildTimelineMilestones } from './utils/timelinePlanner';
+import { buildAdaptiveTimeline, buildTimelineMilestones, buildSmartDailyPlan, buildSmartWeeklyFocus, buildSmartMonthlyMilestones } from './utils/timelinePlanner';
 import { computeBehaviorProfile } from './utils/behaviorProfile';
 import { applyAdaptiveTimelinesToGoals, mergeAdaptiveWarnings, syncBlueprintFromGoals, adaptPendingTasks } from './utils/adaptiveEngine';
 import { filterIntakePlanArtifacts, materializeBlueprintPlan } from './utils/planMaterializer';
@@ -278,6 +278,15 @@ export default function App() {
         timelineMap: Array.isArray(g.timelineMap) && g.timelineMap.length ? g.timelineMap : adaptive.timelineMap,
         targetDescription: g.targetDescription,
         fromIntake: true,
+        dailyPlanItems: Array.isArray(g.dailyPlanItems) && g.dailyPlanItems.length >= 3
+          ? g.dailyPlanItems
+          : buildSmartDailyPlan(g.title || 'Core Goal', false),
+        weeklyFocus: Array.isArray(g.weeklyFocus) && g.weeklyFocus.length >= 2
+          ? g.weeklyFocus
+          : buildSmartWeeklyFocus(g.title || 'Core Goal'),
+        monthlyMilestone: Array.isArray(g.monthlyMilestone) && g.monthlyMilestone.length >= 2
+          ? g.monthlyMilestone
+          : buildSmartMonthlyMilestones(g.title || 'Core Goal'),
       };
     });
 
@@ -314,14 +323,18 @@ export default function App() {
           const date = new Date();
           date.setDate(date.getDate() + d);
           const ds = date.toISOString().split('T')[0];
+          const planItem = newGoals[idx]?.dailyPlanItems?.[d % (newGoals[idx]?.dailyPlanItems?.length || 7)];
+          const taskTitle = planItem?.title || String(t.title || 'Daily habit');
+          const taskDesc = planItem?.description || (t.description ? String(t.description) : undefined);
+          const durMin = planItem?.durationMinutes || Math.min(480, Math.max(1, Number(t.durationMinutes) || 20));
           newTasks.push({
             id: `task-${goalId}-${ti}-${d}-${Date.now()}`,
             milestoneId: firstMs.id,
             goalId,
-            title: String(t.title || 'Daily habit'),
-            description: t.description ? String(t.description) : undefined,
+            title: taskTitle,
+            description: taskDesc,
             scheduledDate: ds,
-            durationMinutes: Math.min(480, Math.max(1, Number(t.durationMinutes) || 20)),
+            durationMinutes: durMin,
             hardness: (Math.min(5, Math.max(1, Number(t.hardness) || 2))) as any,
             isRecurring: true,
             recurrencePattern: 'daily',

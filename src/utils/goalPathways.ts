@@ -15,6 +15,9 @@ import {
   buildMacroPhases,
   buildMicroProgression,
   inferDomain,
+  buildSmartDailyPlan,
+  buildSmartWeeklyFocus,
+  buildSmartMonthlyMilestones,
 } from './timelinePlanner';
 
 export interface GoalHorizonTarget {
@@ -59,6 +62,27 @@ export interface GoalPathwayData {
     thisMonth: GoalHorizonTarget;
     masteryHorizon: GoalHorizonTarget;
   };
+  // 7-Day Action Plan
+  dailyPlanItems: {
+    day: number;
+    title: string;
+    description: string;
+    durationMinutes: number;
+    rationale: string;
+  }[];
+  // 4-Week Progression Roadmap
+  weeklyFocus: {
+    week: number;
+    theme: string;
+    keyAction: string;
+    successCriteria: string;
+  }[];
+  // Monthly Milestones
+  monthlyMilestones: {
+    month: number;
+    milestone: string;
+    measurableOutput: string;
+  }[];
   // Adaptive metrics
   adaptive: {
     estimatedDaysToMastery: number;
@@ -132,67 +156,90 @@ export function getGoalPathway(
   const domain = inferDomain(goal.name + ' ' + (goal.description || ''));
   const hasBlocker = Boolean(userConfig.userIdentity?.primaryBlockers?.length || userConfig.userIdentity?.setbacks?.length);
 
-  // Micro-progression steps from timeline engine
-  const microSteps = buildMicroProgression(goal.name, hasBlocker);
+  // Retrieve unique smart plan or generate domain-specific plan
+  const smartDaily = Array.isArray(goal.dailyPlanItems) && goal.dailyPlanItems.length >= 3
+    ? goal.dailyPlanItems
+    : buildSmartDailyPlan(goal.name, hasBlocker);
+
+  const smartWeekly = Array.isArray(goal.weeklyFocus) && goal.weeklyFocus.length >= 2
+    ? goal.weeklyFocus
+    : buildSmartWeeklyFocus(goal.name);
+
+  const smartMonthly = Array.isArray(goal.monthlyMilestone) && goal.monthlyMilestone.length >= 2
+    ? goal.monthlyMilestone
+    : buildSmartMonthlyMilestones(goal.name);
+
   const macroPhases = buildMacroPhases(goal.name, goal.estimatedDaysToMastery || 180, hasBlocker);
   const domainCheckpoints = buildCheckpoints(goal.name, goal.estimatedDaysToMastery || 180);
 
-  // 1. Resolve Today's Task
+  // 1. Resolve Today's Task based on current streak
+  const streak = computeCurrentGoalStreak(goal.id, dailyLogs, todayStr);
+  const dayIndex = streak % smartDaily.length;
+  const todayPlanItem = smartDaily[dayIndex] || smartDaily[0];
+
   const existingTodayTask = plannedTasks.find(
     (t) => t.goalId === goal.id && t.scheduledDate === todayStr
   );
   const todayLog = dailyLogs.find((l) => l.goalId === goal.id && l.date === todayStr);
   const isCompletedToday = todayLog?.completed === true || existingTodayTask?.status === 'done';
 
-  const todayTaskTitle = existingTodayTask?.title ||
-    microSteps[0]?.dailyActions?.[0] ||
-    `Complete daily focus block for ${goal.name}`;
+  const todayTaskTitle = existingTodayTask?.title || todayPlanItem.title;
 
   const todayTask = {
     id: existingTodayTask?.id || `auto-today-${goal.id}`,
     title: todayTaskTitle,
-    description: existingTodayTask?.description || goal.description || 'Show up and execute your primary focus session.',
-    durationMinutes: existingTodayTask?.durationMinutes || 25,
+    description: existingTodayTask?.description || todayPlanItem.description || goal.description || 'Show up and execute your primary focus session.',
+    durationMinutes: existingTodayTask?.durationMinutes || todayPlanItem.durationMinutes || 25,
     hardness: existingTodayTask?.hardness || (goal.difficulty === 'high' ? 4 : goal.difficulty === 'low' ? 2 : 3),
     completed: isCompletedToday,
     isGenerated: !existingTodayTask,
   };
 
   // 2. Resolve Tomorrow's Expected Task
+  const tomorrowPlanItem = smartDaily[(dayIndex + 1) % smartDaily.length] || smartDaily[1];
   const existingTomorrowTask = plannedTasks.find(
     (t) => t.goalId === goal.id && t.scheduledDate === tomorrowStr
   );
 
-  const tomorrowTaskTitle = existingTomorrowTask?.title ||
-    microSteps[0]?.dailyActions?.[1] ||
-    `Deepen deliberate practice & log checkpoint metric for ${goal.name}`;
+  const tomorrowTaskTitle = existingTomorrowTask?.title || tomorrowPlanItem.title;
 
   const tomorrowTask = {
     id: existingTomorrowTask?.id || `auto-tomorrow-${goal.id}`,
     title: tomorrowTaskTitle,
-    description: existingTomorrowTask?.description || 'Build upon today’s momentum with zero activation friction.',
-    durationMinutes: existingTomorrowTask?.durationMinutes || 30,
+    description: existingTomorrowTask?.description || tomorrowPlanItem.description || 'Build upon today’s momentum with zero activation friction.',
+    durationMinutes: existingTomorrowTask?.durationMinutes || tomorrowPlanItem.durationMinutes || 30,
     hardness: existingTomorrowTask?.hardness || (goal.difficulty === 'high' ? 4 : 3),
-    rationale: microSteps[0]?.progressionMechanism ||
+    rationale: tomorrowPlanItem.rationale ||
       'Completing today’s baseline habit eliminates neural resistance, unlocking higher willpower for tomorrow’s execution.',
   };
 
   // 3. Multi-Horizon Targets (Week, Month, Mastery Horizon)
+  const currentWeekItem = smartWeekly[0] || {
+    theme: 'Habit Anchor & Initial Output',
+    keyAction: 'Lock in baseline consistency and eliminate startup procrastination.',
+    successCriteria: '5+ execution sessions completed + zero broken streaks',
+  };
+
   const thisWeek: GoalHorizonTarget = {
     period: 'End of This Week (Days 1–7)',
     badge: 'Weekly Milestone',
-    title: 'Habit Anchor & Initial Output',
-    targetMetric: '5+ execution sessions completed + zero broken streaks',
-    description: microSteps[0]?.focus || 'Lock in baseline consistency and eliminate startup procrastination.',
+    title: currentWeekItem.theme,
+    targetMetric: currentWeekItem.successCriteria,
+    description: currentWeekItem.keyAction,
     progressionNote: 'Focus strictly on showing up and starting — 0 pressure for perfection.',
     status: 'current',
+  };
+
+  const currentMonthItem = smartMonthly[0] || {
+    milestone: macroPhases[0]?.title || 'Phase 1 Foundation & System Scale',
+    measurableOutput: domainCheckpoints[0]?.targetOutputMetric || '30 consecutive days logged + 1st core project deliverable',
   };
 
   const thisMonth: GoalHorizonTarget = {
     period: 'End of This Month (Days 8–30)',
     badge: 'Monthly Checkpoint',
-    title: macroPhases[0]?.title || 'Phase 1 Foundation & System Scale',
-    targetMetric: domainCheckpoints[0]?.targetOutputMetric || '30 consecutive days logged + 1st core project deliverable',
+    title: currentMonthItem.milestone,
+    targetMetric: currentMonthItem.measurableOutput,
     description: macroPhases[0]?.description || 'Scale execution duration and complete intermediate project milestones.',
     progressionNote: macroPhases[0]?.transitionCondition || 'Verify daily capacity and build automaticity.',
     status: 'upcoming',
@@ -202,11 +249,16 @@ export function getGoalPathway(
   const masteryTargetDate = new Date();
   masteryTargetDate.setDate(masteryTargetDate.getDate() + estimatedDays);
 
+  const lastMonthItem = smartMonthly[smartMonthly.length - 1] || {
+    milestone: macroPhases[2]?.title || 'Full-Scale Compounding & Real-World Mastery',
+    measurableOutput: domainCheckpoints[2]?.targetOutputMetric || 'Master milestone locked in with automatic lifestyle integration',
+  };
+
   const masteryHorizon: GoalHorizonTarget = {
     period: `Mastery Target (${formatMonthYear(masteryTargetDate)})`,
     badge: 'Master Horizon',
-    title: macroPhases[2]?.title || 'Full-Scale Compounding & Real-World Mastery',
-    targetMetric: domainCheckpoints[2]?.targetOutputMetric || 'Master milestone locked in with automatic lifestyle integration',
+    title: lastMonthItem.milestone,
+    targetMetric: lastMonthItem.measurableOutput,
     description: macroPhases[2]?.description || 'Durable long-term results, high leverage output, and complete goal fulfillment.',
     progressionNote: `Projected timeline: ~${estimatedDays} days of consistent compounding.`,
     status: 'mastery',
@@ -214,7 +266,6 @@ export function getGoalPathway(
 
   // 4. Live Adaptive Metrics
   const completionRate = computeGoalCompletionRate(goal.id, dailyLogs);
-  const streak = computeCurrentGoalStreak(goal.id, dailyLogs, todayStr);
 
   let velocityStatus: 'accelerating' | 'on_track' | 'recalibrating' = 'on_track';
   let velocityLabel = 'Steady Cadence (On Track)';
@@ -244,6 +295,9 @@ export function getGoalPathway(
       thisMonth,
       masteryHorizon,
     },
+    dailyPlanItems: smartDaily,
+    weeklyFocus: smartWeekly,
+    monthlyMilestones: smartMonthly,
     adaptive: {
       estimatedDaysToMastery: estimatedDays,
       projectedMasteryDate: formatMonthYear(masteryTargetDate),
@@ -275,18 +329,19 @@ export function ensureTasksForGoals(
     const hasToday = updatedTasks.some((t) => t.goalId === goal.id && t.scheduledDate === todayStr);
     const hasTomorrow = updatedTasks.some((t) => t.goalId === goal.id && t.scheduledDate === tomorrowStr);
 
-    const domain = inferDomain(goal.name);
-    const micro = buildMicroProgression(goal.name, false);
+    const smartDaily = Array.isArray(goal.dailyPlanItems) && goal.dailyPlanItems.length >= 3
+      ? goal.dailyPlanItems
+      : buildSmartDailyPlan(goal.name, false);
 
     if (!hasToday) {
       updatedTasks.push({
         id: `task-${goal.id}-${todayStr}`,
         milestoneId: `ms-${goal.id}-0`,
         goalId: goal.id,
-        title: micro[0]?.dailyActions?.[0] || `Daily focus on ${goal.name}`,
-        description: goal.description || 'Show up and execute primary daily habit.',
+        title: smartDaily[0]?.title || `Daily focus on ${goal.name}`,
+        description: smartDaily[0]?.description || goal.description || 'Show up and execute primary daily habit.',
         scheduledDate: todayStr,
-        durationMinutes: 25,
+        durationMinutes: smartDaily[0]?.durationMinutes || 25,
         hardness: goal.difficulty === 'high' ? 4 : goal.difficulty === 'low' ? 2 : 3,
         isRecurring: true,
         recurrencePattern: 'daily',
@@ -300,10 +355,10 @@ export function ensureTasksForGoals(
         id: `task-${goal.id}-${tomorrowStr}`,
         milestoneId: `ms-${goal.id}-0`,
         goalId: goal.id,
-        title: micro[0]?.dailyActions?.[1] || `Follow-up execution on ${goal.name}`,
-        description: 'Advance to the next incremental deliverable.',
+        title: smartDaily[1]?.title || `Follow-up execution on ${goal.name}`,
+        description: smartDaily[1]?.description || 'Advance to the next incremental deliverable.',
         scheduledDate: tomorrowStr,
-        durationMinutes: 30,
+        durationMinutes: smartDaily[1]?.durationMinutes || 30,
         hardness: goal.difficulty === 'high' ? 4 : 3,
         isRecurring: true,
         recurrencePattern: 'daily',

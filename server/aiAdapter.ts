@@ -5,6 +5,9 @@ import {
   buildMacroPhases,
   buildCheckpoints,
   buildMicroProgression,
+  buildSmartDailyPlan,
+  buildSmartWeeklyFocus,
+  buildSmartMonthlyMilestones,
 } from '../src/utils/timelinePlanner';
 import {
   analyzeIntakeCoverage,
@@ -727,6 +730,20 @@ function normalizeTimelineOutput(goal: any, behaviorProfile?: any, researchConte
   const description = String(goal.targetDescription || goal.description || '');
   const base = buildAdaptiveTimeline(title, description, behaviorProfile, researchContext, goal.timelineRange);
   const milestoneGoalId = String(goal.id || goal.goalId || goal.title || goal.name || `goal-${Date.now()}`);
+  const hasBlocker = /lazy|laziness|procrastinat|lack of focus|low discipline|distraction|phone|struggle/i.test(`${title} ${description}`);
+
+  const dailyPlanItems = Array.isArray(goal.dailyPlanItems) && goal.dailyPlanItems.length >= 3
+    ? goal.dailyPlanItems
+    : buildSmartDailyPlan(title, hasBlocker);
+
+  const weeklyFocus = Array.isArray(goal.weeklyFocus) && goal.weeklyFocus.length >= 2
+    ? goal.weeklyFocus
+    : buildSmartWeeklyFocus(title);
+
+  const monthlyMilestone = Array.isArray(goal.monthlyMilestone) && goal.monthlyMilestone.length >= 2
+    ? goal.monthlyMilestone
+    : buildSmartMonthlyMilestones(title);
+
   return {
     ...goal,
     title,
@@ -738,6 +755,9 @@ function normalizeTimelineOutput(goal: any, behaviorProfile?: any, researchConte
     milestones: Array.isArray(goal.milestones) && goal.milestones.length
       ? goal.milestones
       : buildTimelineMilestones(milestoneGoalId, goal.timelineRange || base.timelineRange, title),
+    dailyPlanItems,
+    weeklyFocus,
+    monthlyMilestone,
   };
 }
 
@@ -1703,7 +1723,11 @@ If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONL
       json: true,
       temperature: 0.45,
       messages: [
-        { role: 'system', content: 'Generate realistic habit plans with milestones, compact timeline maps, daily tasks (hardness 1-5), and dependencies. Return JSON only.' },
+        { role: 'system', content: `Generate ultra-actionable, domain-specific habit execution plans with sequential 7-day action items, weekly progression, and monthly milestones.
+CRITICAL INSTRUCTION:
+DO NOT generate generic placeholders like "spend 15 minutes on becoming a billionaire daily" or "read 20 minutes".
+You MUST generate unique, concrete, realistic daily tasks for Day 1 through Day 7 tailored specifically to the goal (e.g. for wealth: Day 1: Audit income & expenses; Day 2: Read 'Rich Dad Poor Dad' chapters 1-3; Day 3: Map 3 cashflow streams; Day 4: Open broker account and invest $25; Day 5: Draft 1-page service offer; Day 6: Outreach to 5 clients; Day 7: Weekly financial review).
+Each daily item MUST explain why completing today's task unlocks tomorrow's execution. Return JSON only.` },
         {
           role: 'user',
           content: `Goals: ${JSON.stringify(collectedGoals)}\nConstraints: ${JSON.stringify(constraints)}${profileCtx}${researchCtx ? `\nResearch:\n${researchCtx.slice(0, 1500)}` : ''}
@@ -2003,8 +2027,30 @@ export class FallbackAIAdapter implements AIProvider {
     return { score: 7, canOverride: true, message: 'Offline assessment' };
   }
 
-  async synthesizePlan(_params: any) {
-    return { goals: [], dependencies: [] };
+  async synthesizePlan(params: any) {
+    const rawGoals = params.collectedGoals || params.intakeData?.goals || (params.intakeData ? [params.intakeData] : []);
+    const collectedGoals = Array.isArray(rawGoals) ? rawGoals : [rawGoals];
+    const goals = collectedGoals.map((g: any, idx: number) => {
+      const title = g.title || g.name || 'Core Focus Habit';
+      return normalizeTimelineOutput({
+        id: g.id || `goal-plan-${idx + 1}`,
+        title,
+        targetDescription: g.targetDescription || g.description || `Focused progression plan for ${title}`,
+        category: g.category || mapToPassiveCategory(undefined, title),
+        chanceOfAchievement: 85,
+        timelineRange: g.timelineRange || { minDays: 60, maxDays: 180 },
+        timelineSummary: 'Phase 1 foundational habit leading into phase 2 capability lift and phase 3 compounding results.',
+        timelineMap: [
+          'Phase 1 (Days 1–30): Foundation & Blocker Neutralization',
+          'Phase 2 (Months 2–6): Capability Depth & Output Building',
+          'Phase 3 (Months 6+): Compounding Mastery & Sustainable Results',
+        ],
+        dailyPlanItems: buildSmartDailyPlan(title, false),
+        weeklyFocus: buildSmartWeeklyFocus(title),
+        monthlyMilestone: buildSmartMonthlyMilestones(title),
+      }, params.behaviorProfile);
+    });
+    return { goals, dependencies: [] };
   }
 
   async chainGoals(_params: any) {
