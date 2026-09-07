@@ -739,7 +739,10 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
     <div className="space-y-0 max-w-6xl mx-auto">
 
       {/* ─── TOP TAB BAR ─── Full-page ChatGPT style */}
-      <div className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-2.5 flex items-center justify-between gap-3">
+      <div
+        className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-xl border-b border-zinc-800/60 px-4 py-2.5 flex items-center justify-between gap-3"
+        style={{ paddingTop: 'max(0.625rem, env(safe-area-inset-top, 0px))' }}
+      >
         {/* Left: Return to Home / Exit Chat button */}
         <button
           type="button"
@@ -1519,7 +1522,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
       {/* TAB 2: NEXUS CHAT — Full-page ChatGPT style */}
       {activeTab === 'chat' && (
-        <div className="flex flex-col h-[calc(100dvh-4rem-env(safe-area-inset-top,0px)-49px)] sm:h-[calc(100vh-4rem-env(safe-area-inset-top,0px)-49px)] bg-black overflow-hidden">
+        <div className="flex flex-col h-[calc(100dvh-max(3.25rem,env(safe-area-inset-top,0px)+2.75rem))] sm:h-[calc(100vh-max(3.25rem,env(safe-area-inset-top,0px)+2.75rem))] bg-black overflow-hidden">
 
           {/* Offline / Error Banners */}
           {brainOffline && (

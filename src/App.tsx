@@ -976,50 +976,54 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500 selection:text-zinc-950 antialiased">
-      {/* Top Navbar */}
-      <Navbar
-        currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
-        compositeScore={scoreData.composite}
-        categoryScores={scoreData.scores}
-        userConfig={userConfig}
-        onExport={exportBackupJSON}
-        onAnonymizeExport={exportAnonymizedBackupJSON}
-        onImport={handleImportJSON}
-        onResetOnboarding={handleRerunGoalScout}
-        settingsContent={
-          <div className="space-y-4">
-            <AiServerSettings
-              userConfig={userConfig}
-              onUpdateUserConfig={handleUpdateUserConfig}
-            />
-            <LocationSettings
-              userConfig={userConfig}
-              onUpdateUserConfig={handleUpdateUserConfig}
-            />
-            <SmartReminderNotifier
-              goals={goals}
-              dailyLogs={dailyLogs}
-              todayStr={todayStr}
-              onToggleGoal={handleToggleGoal}
-              showControls
-              runScheduler={false}
-            />
-            <NexusNotificationCenter
-              goals={goals}
-              dailyLogs={dailyLogs}
-              todayStr={todayStr}
-              scoreData={scoreData}
-              userConfig={userConfig}
-              onToggleGoal={handleToggleGoal}
-              onNavigateTab={(tab) => setCurrentTab(tab)}
-              onUpdateUserConfig={handleUpdateUserConfig}
-            />
-          </div>
-        }
-      />
-      {/* Keeps content below the fixed top bar */}
-      <div className="app-topbar-spacer" aria-hidden="true" />
+      {/* Top Navbar — hidden in NEXUS chat so it's a true full-page talking interface */}
+      {currentTab !== 'aicoach' && (
+        <>
+          <Navbar
+            currentTab={currentTab}
+            setCurrentTab={setCurrentTab}
+            compositeScore={scoreData.composite}
+            categoryScores={scoreData.scores}
+            userConfig={userConfig}
+            onExport={exportBackupJSON}
+            onAnonymizeExport={exportAnonymizedBackupJSON}
+            onImport={handleImportJSON}
+            onResetOnboarding={handleRerunGoalScout}
+            settingsContent={
+              <div className="space-y-4">
+                <AiServerSettings
+                  userConfig={userConfig}
+                  onUpdateUserConfig={handleUpdateUserConfig}
+                />
+                <LocationSettings
+                  userConfig={userConfig}
+                  onUpdateUserConfig={handleUpdateUserConfig}
+                />
+                <SmartReminderNotifier
+                  goals={goals}
+                  dailyLogs={dailyLogs}
+                  todayStr={todayStr}
+                  onToggleGoal={handleToggleGoal}
+                  showControls
+                  runScheduler={false}
+                />
+                <NexusNotificationCenter
+                  goals={goals}
+                  dailyLogs={dailyLogs}
+                  todayStr={todayStr}
+                  scoreData={scoreData}
+                  userConfig={userConfig}
+                  onToggleGoal={handleToggleGoal}
+                  onNavigateTab={(tab) => setCurrentTab(tab)}
+                  onUpdateUserConfig={handleUpdateUserConfig}
+                />
+              </div>
+            }
+          />
+          {/* Keeps content below the fixed top bar */}
+          <div className="app-topbar-spacer" aria-hidden="true" />
+        </>
+      )}
 
       <SmartReminderNotifier
         goals={goals}
