@@ -7,6 +7,7 @@ interface RescueHabitPromptProps {
   goals: Goal[];
   dailyLogs: DailyGoalLog[];
   todayStr: string;
+  scoreData?: any;
   onToggleGoal: (goalId: string) => void;
 }
 
@@ -68,20 +69,55 @@ export const RescueHabitPrompt: React.FC<RescueHabitPromptProps> = ({
   goals,
   dailyLogs,
   todayStr,
+  scoreData,
   onToggleGoal,
 }) => {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [accepted, setAccepted] = useState<Set<string>>(new Set());
 
-  const atRiskGoals = useMemo(() => {
-    return goals
-      .filter((g) => !g.archived && !dismissed.has(g.id))
-      .map((g) => ({ goal: g, missed: getMissedDays(g, dailyLogs, todayStr) }))
-      .filter(({ missed }) => missed >= 2)
-      .slice(0, 2); // Show max 2 rescue cards at once
-  }, [goals, dailyLogs, todayStr, dismissed]);
+  // 1. TIMING RULE: Only appear when user is close to finishing a day (5:00 PM / 17:00 onwards).
+  // If it's still early in the day (morning / early afternoon), it does NOT pop up.
+  const currentHour = new Date().getHours();
+  const isCloseToEndOfDay = currentHour >= 17;
 
-  if (atRiskGoals.length === 0) return null;
+  // 2. Set of goal IDs already accomplished today
+  const completedTodayIds = useMemo(() => {
+    return new Set(
+      (dailyLogs || []).filter((l) => l.date === todayStr && l.completed).map((l) => l.goalId)
+    );
+  }, [dailyLogs, todayStr]);
+
+  const atRiskGoals = useMemo(() => {
+    // If early in the day, do not pop up!
+    if (!isCloseToEndOfDay) return [];
+
+    return (goals || [])
+      .filter((g) => {
+        if (!g || g.archived || dismissed.has(g.id)) return false;
+        // If user already accomplished this goal today, it does NOT pop up!
+        if (completedTodayIds.has(g.id)) return false;
+
+        const currentStreak = scoreData?.streakData?.[g.id]?.streak || 0;
+        const missed = getMissedDays(g, dailyLogs, todayStr);
+
+        // At risk if user has an active streak (>= 1) or missed days (>= 1)
+        return currentStreak >= 1 || missed >= 1;
+      })
+      .map((g) => {
+        const currentStreak = scoreData?.streakData?.[g.id]?.streak || 0;
+        const missed = getMissedDays(g, dailyLogs, todayStr);
+        return {
+          goal: g,
+          streak: currentStreak,
+          missed,
+        };
+      })
+      // Sort by highest streak first (most critical to preserve)
+      .sort((a, b) => b.streak - a.streak)
+      .slice(0, 2); // Show max 2 rescue cards at once
+  }, [goals, dailyLogs, todayStr, dismissed, completedTodayIds, scoreData, isCloseToEndOfDay]);
+
+  if (!isCloseToEndOfDay || atRiskGoals.length === 0) return null;
 
   const handleAccept = (goalId: string) => {
     setAccepted((prev) => new Set(prev).add(goalId));
@@ -97,19 +133,19 @@ export const RescueHabitPrompt: React.FC<RescueHabitPromptProps> = ({
   };
 
   return (
-    <div className="space-y-2 mb-4">
+    <div className="space-y-2.5 my-1">
       <AnimatePresence>
-        {atRiskGoals.map(({ goal, missed }) => {
+        {atRiskGoals.map(({ goal, streak, missed }) => {
           const microHabit = getMicroHabit(goal);
           const isAccepted = accepted.has(goal.id);
 
           return (
             <motion.div
               key={goal.id}
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative rounded-2xl border border-amber-500/35 hover:border-amber-400/50 bg-gradient-to-br from-zinc-950/95 via-zinc-900/90 to-black/95 p-4 sm:p-5 shadow-2xl shadow-black/80 overflow-hidden transition-all duration-300"
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="relative rounded-2xl border border-amber-500/35 hover:border-amber-400/50 bg-gradient-to-br from-zinc-950/95 via-zinc-900/90 to-black/95 p-4 sm:p-5 shadow-xl shadow-black/70 overflow-hidden transition-all duration-300"
             >
               {/* Golden amber pulse accent */}
               <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-amber-500/15 blur-2xl pointer-events-none" />
@@ -129,9 +165,17 @@ export const RescueHabitPrompt: React.FC<RescueHabitPromptProps> = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                     <span className="text-[10px] font-mono font-bold uppercase text-amber-400 tracking-wider bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-full">
-                      Streak at risk
+                      Evening Streak Rescue
                     </span>
-                    <span className="text-[10px] font-mono text-zinc-400">· {missed} days missed</span>
+                    {streak > 0 ? (
+                      <span className="text-[10px] font-mono text-amber-300/90 font-semibold">
+                        · 🔥 {streak}d streak at risk tonight
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        · {missed} day{missed !== 1 ? 's' : ''} slipping
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm font-semibold text-white truncate">{goal.name}</p>
                   <div className="mt-2.5 p-2 rounded-xl bg-zinc-950/80 border border-amber-500/20 flex items-start gap-2">
@@ -145,7 +189,7 @@ export const RescueHabitPrompt: React.FC<RescueHabitPromptProps> = ({
                 {isAccepted ? (
                   <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold">
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>Marked done! Streak saved 🔥</span>
+                    <span>Marked done! Streak preserved 🔥</span>
                   </div>
                 ) : (
                   <button

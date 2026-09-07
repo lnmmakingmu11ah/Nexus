@@ -64,6 +64,7 @@ import { DailyJournal } from '../types';
 import { GoalPathwayModal } from './GoalPathwayModal';
 import { getGoalPathway } from '../utils/goalPathways';
 import { StreakBurst, useStreakBurst } from './StreakBurst';
+import { RescueHabitPrompt } from './RescueHabitPrompt';
 
 interface DashboardProps {
   scoreData: ScoreCalculationResult;
@@ -317,6 +318,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Streak at Risk Alert — appears close to the top below Today's Mission when evening is setting in without completing goals */}
+      <RescueHabitPrompt
+        goals={goals}
+        dailyLogs={dailyLogs}
+        todayStr={todayStr}
+        scoreData={scoreData}
+        onToggleGoal={onToggleGoal}
+      />
 
       {/* Major Life Targets Banner (Ultimate Endpoints) */}
       {((userConfig.masterBlueprint?.lifetimeMegaGoals && userConfig.masterBlueprint.lifetimeMegaGoals.length > 0) ||

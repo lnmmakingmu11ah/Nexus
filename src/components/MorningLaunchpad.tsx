@@ -8,6 +8,7 @@ interface MorningLaunchpadProps {
   goals: Goal[];
   todayStr: string;
   userName?: string;
+  dailyLogs?: any[];
   onClose: () => void;
 }
 
@@ -46,6 +47,7 @@ export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
   goals = [],
   todayStr,
   userName = 'Champion',
+  dailyLogs = [],
   onClose,
 }) => {
   // Safely pick quote deterministically by day with fallback
@@ -56,37 +58,44 @@ export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
   const displayName = (userName || 'Champion').trim();
   const firstName = displayName ? displayName.split(' ')[0] : 'Champion';
 
-  // Top 3 priority goals (incomplete today)
-  const priorityGoals = (goals || [])
-    .filter((g) => g && !g.archived)
-    .slice(0, 3);
+  // Completed goal IDs today
+  const completedTodayIds = new Set(
+    (dailyLogs || []).filter((l: any) => l.date === todayStr && l.completed).map((l: any) => l.goalId)
+  );
+
+  // Top 3 priority goals (incomplete today first, fallback to active)
+  const pendingGoals = (goals || []).filter((g) => g && !g.archived && !completedTodayIds.has(g.id));
+  const priorityGoals = (pendingGoals.length > 0 ? pendingGoals : (goals || []).filter((g) => g && !g.archived)).slice(0, 3);
 
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? '🌅 Good morning' : hour < 18 ? '☀️ Good afternoon' : '🌙 Good evening';
 
   return (
-    <>
+    <motion.div
+      key="morning-launchpad"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-[200]"
+    >
       {/* Backdrop overlay */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+      <div
+        className="absolute inset-0 bg-black/80 backdrop-blur-md cursor-pointer"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
         }}
-        className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-md cursor-pointer"
       />
 
-      {/* Dialog container */}
-      <div className="fixed inset-0 z-[201] flex items-end sm:items-center justify-center p-3 sm:p-4 pointer-events-none">
+      {/* Dialog container — pointer-events-none so clicks pass through to backdrop */}
+      <div className="absolute inset-0 z-10 flex items-end sm:items-center justify-center p-3 sm:p-4 pointer-events-none">
         <motion.div
           initial={{ y: 50, opacity: 0, scale: 0.96 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 50, opacity: 0, scale: 0.96 }}
-          transition={{ duration: 0.25, ease: 'easeOut' }}
+          transition={{ duration: 0.28, ease: 'easeOut' }}
           className="pointer-events-auto relative w-full max-w-sm bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/40 rounded-3xl shadow-2xl overflow-hidden cursor-default"
         >
           {/* Glow accent */}
@@ -142,11 +151,17 @@ export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
                       <span className="text-[11px] font-mono text-zinc-500 shrink-0 w-4">{i + 1}.</span>
                       <div className="min-w-0 flex-1">
                         <p className="text-[12px] font-semibold text-zinc-100 truncate">{goal.name}</p>
-                        {goal.dailyPlanItems && goal.dailyPlanItems[0] && (
-                          <p className="text-[10px] text-zinc-500 truncate mt-0.5">
-                            {goal.dailyPlanItems[0]}
-                          </p>
-                        )}
+                        {(() => {
+                          const planItem = goal.dailyPlanItems?.[0];
+                          const subtitle =
+                            (typeof planItem === 'object' && planItem ? planItem.title || planItem.description : typeof planItem === 'string' ? planItem : null) ||
+                            goal.description;
+                          return subtitle ? (
+                            <p className="text-[10px] text-zinc-400 truncate mt-0.5">
+                              {subtitle}
+                            </p>
+                          ) : null;
+                        })()}
                       </div>
                       <ChevronRight className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
                     </div>
@@ -178,6 +193,6 @@ export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
           </div>
         </motion.div>
       </div>
-    </>
+    </motion.div>
   );
 };

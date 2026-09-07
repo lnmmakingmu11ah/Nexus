@@ -1102,17 +1102,6 @@ export default function App() {
           />
         )}
 
-
-        {/* Rescue Habit prompt — shown inside dashboard tab when goals are slipping */}
-        {currentTab === 'dashboard' && (
-          <RescueHabitPrompt
-            goals={goals}
-            dailyLogs={dailyLogs}
-            todayStr={todayStr}
-            onToggleGoal={handleToggleGoal}
-          />
-        )}
-
         {currentTab === 'aicoach' && (
           <AICoachView
             userConfig={userConfig}
@@ -1318,6 +1307,7 @@ export default function App() {
         {showLaunchpad && (
           <MorningLaunchpad
             goals={goals}
+            dailyLogs={dailyLogs}
             todayStr={todayStr}
             userName={userConfig.userName}
             onClose={dismissLaunchpad}
