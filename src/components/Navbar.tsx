@@ -84,7 +84,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <header className={`app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/60 will-change-transform transition-transform duration-300 ease-in-out ${isHeaderHidden ? '-translate-y-full' : 'translate-y-0'}`}>
+    <header className={`app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/60 will-change-transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isHeaderHidden ? '-translate-y-full' : 'translate-y-0'}`}>
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 relative">
           {/* Left spacer for perfect geometric center balance */}

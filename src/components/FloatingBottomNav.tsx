@@ -193,7 +193,7 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
 
       {/* Main 5-Slot Bottom Floating Bar */}
       <div
-        className={`fixed left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-40 md:hidden transition-all duration-300 ease-in-out ${
+        className={`fixed left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-40 md:hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isVisible || showMoreDrawer
             ? 'translate-y-0 opacity-100 pointer-events-auto'
             : 'translate-y-28 opacity-0 pointer-events-none'
