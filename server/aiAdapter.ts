@@ -1434,6 +1434,20 @@ RULE ON ADDRESSING BLOCKERS & BOTTLENECKS FIRST (MANDATORY PREREQUISITE SEQUENCI
    - The primary goal's transition condition must explicitly require the prerequisite bottleneck to be resolved before Phase 2 hypertrophy training begins.
    - In goalStackUps and goalCorrelations, link the resource-unlock goal as a supporting/prerequisite feeder for the primary goal.
 
+3. DECONSTRUCTING BROAD OR ABSTRACT GOALS (e.g. "Become Wise", "Achieve Inner Peace", "Build Charisma"):
+   - Broad or philosophical ambitions MUST NEVER be left as vague ideas.
+   - You MUST operationalize and deconstruct them into concrete, daily, observable practices.
+   - For example, if the goal is "Become Wise":
+     * Deconstruct into: (a) Daily 20-min reading of primary philosophical/epistemological literature (Stoicism, Eastern philosophy, Popper, Kahneman); (b) Daily Socratic evening decision-journaling (analyzing 1 decision, identifying cognitive biases or blind spots); (c) Deliberate active listening exercise in daily conversations; (d) Mental models application drill.
+   - Ground every abstract ambition in actionable daily behavior that can be tracked, measured, and progressed.
+
+4. HANDLING MULTIPLE GOALS INDEPENDENTLY & SYNERGISTICALLY:
+   - If the user specifies multiple ambitions (e.g. "Become wise", "Run a half marathon", "Learn Python", "Build a side income"):
+     * Capture ALL goals without dropping or ignoring any. Include each in lifetimeMegaGoals and plannedGoals.
+     * Build INDEPENDENT, distinct, highly customized daily tasks and progression pathways for each. NEVER output repetitive, copy-paste, or generic task templates.
+     * Discover and map SYNERGISTIC LINKAGES in goalStackUps and goalCorrelations (e.g. how morning physical discipline fuels cognitive stamina for deep programming; how wisdom reflection prevents burnout in business).
+     * Provide seamless clarity so the user simply checks off their daily missions without planning fatigue.
+
 STRUCTURE OF THE OUTPUT PLAN (MANDATORY):
 1. Executive Strategy Summary:
    - Clear statement of the goal, total estimated timeline, and the overarching strategic approach.
