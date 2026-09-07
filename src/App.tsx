@@ -25,6 +25,8 @@ import { HabitStackPrompt } from './components/HabitStackPrompt';
 import { triggerHapticFeedback } from './utils/haptics';
 import { aiClient } from './services/aiClient';
 import { mergeMemory } from './utils/aiMemory';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 import {
   AIDigest,
@@ -107,6 +109,14 @@ export default function App() {
   const [isPlanBuilding, setIsPlanBuilding] = useState(false);
   const [planBuildingStage, setPlanBuildingStage] = useState<string>('Analyzing your goals…');
   const [planBuildDone, setPlanBuildDone] = useState(false);
+
+  // Initialize native status bar style and color on device mount
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#09090b' }).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (!userConfig.onboarded) return;
@@ -467,7 +477,7 @@ export default function App() {
   } | null>(null);
 
   // Compute today's scores
-  const scoreData = calculateScoresForDate(todayStr, goals, dailyLogs, userConfig);
+  const scoreData = calculateScoresForDate(todayStr, goals, dailyLogs, userConfig, journals);
 
   // Handlers
   const handleCompleteOnboarding = (newConfig: UserConfig, synthesizedGoals?: Partial<Goal>[]) => {
@@ -738,7 +748,7 @@ export default function App() {
       }
     }
 
-    const latestScores = calculateScoresForDate(todayStr, goals, updatedLogs, userConfig);
+    const latestScores = calculateScoresForDate(todayStr, goals, updatedLogs, userConfig, journals);
     checkAndUnlockBadges(
       goals,
       updatedLogs,
@@ -1124,6 +1134,7 @@ export default function App() {
             dailyLogs={dailyLogs}
             todayStr={todayStr}
             userConfig={userConfig}
+            journals={journals}
           />
         )}
 

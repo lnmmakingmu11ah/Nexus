@@ -21,6 +21,7 @@ import {
   DailyGoalLog,
   Goal,
   UserConfig,
+  DailyJournal,
 } from '../types';
 import { calculateScoresForDate } from '../utils/scoring';
 
@@ -29,6 +30,7 @@ interface WeeklyRecapProps {
   dailyLogs: DailyGoalLog[];
   userConfig: UserConfig;
   todayStr?: string;
+  journals?: DailyJournal[];
 }
 
 export const WeeklyRecap: React.FC<WeeklyRecapProps> = ({
@@ -36,6 +38,7 @@ export const WeeklyRecap: React.FC<WeeklyRecapProps> = ({
   dailyLogs,
   userConfig,
   todayStr,
+  journals,
 }) => {
   const [selectedMetric, setSelectedMetric] = useState<'growth' | 'completion'>('growth');
 
@@ -64,10 +67,10 @@ export const WeeklyRecap: React.FC<WeeklyRecapProps> = ({
 
     // Score calculations for each day
     const dailyResults = dates.map((dateStr) =>
-      calculateScoresForDate(dateStr, goals, dailyLogs, userConfig)
+      calculateScoresForDate(dateStr, goals, dailyLogs, userConfig, journals)
     );
 
-    const baselineResult = calculateScoresForDate(baselineDateStr, goals, dailyLogs, userConfig);
+    const baselineResult = calculateScoresForDate(baselineDateStr, goals, dailyLogs, userConfig, journals);
     const todayResult = dailyResults[dailyResults.length - 1]; // d-0
 
     // Overall completion math
@@ -84,7 +87,7 @@ export const WeeklyRecap: React.FC<WeeklyRecapProps> = ({
     for (let i = 13; i >= 7; i--) {
       const d = new Date(anchor);
       d.setDate(d.getDate() - i);
-      const res = calculateScoresForDate(d.toISOString().split('T')[0], goals, dailyLogs, userConfig);
+      const res = calculateScoresForDate(d.toISOString().split('T')[0], goals, dailyLogs, userConfig, journals);
       prevWeekCompleted += res.totalCompleted;
       prevWeekPossible += res.totalGoals;
     }

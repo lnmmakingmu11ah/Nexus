@@ -230,8 +230,8 @@ export function ensurePillarCoverage(
   return plannedGoals;
 }
 
-/** Caps daily habits so new users aren't overwhelmed on day 1 */
-export function capDailyPlannedGoals(goals: NormalizedPlannedGoal[], maxDaily = STRUGGLING_CAP): NormalizedPlannedGoal[] {
+/** Caps daily habits if excessive so new users aren't overwhelmed on day 1 (default generous to capture all user goals) */
+export function capDailyPlannedGoals(goals: NormalizedPlannedGoal[], maxDaily = 12): NormalizedPlannedGoal[] {
   const daily = goals.filter((g) => (g.targetFrequency || 'daily') !== 'weekly');
   const weekly = goals.filter((g) => g.targetFrequency === 'weekly');
   if (daily.length <= maxDaily) return goals;
@@ -365,7 +365,8 @@ export function normalizeBlueprint(
       };
     });
 
-  plannedGoals = capDailyPlannedGoals(plannedGoals, STRUGGLING_CAP);
+  // Preserve all user goals without demoting extras - if the user sets multiple goals, capture them all
+  // plannedGoals retains all planned goals as active habits
 
   const allSetbacks = Array.from(
     new Set([

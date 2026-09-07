@@ -134,13 +134,15 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
             <CalendarIcon className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-white tracking-tight flex items-center gap-2">
-              <span>Consistency Calendar</span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-base font-semibold text-white tracking-tight">
+                Consistency Calendar
+              </h3>
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0">
                 Monthly Graph
               </span>
-            </h3>
-            <p className="text-xs text-zinc-400">
+            </div>
+            <p className="text-xs text-zinc-400 mt-0.5">
               Highlighting days where all key goals were 100% completed ⭐
             </p>
           </div>
@@ -306,7 +308,7 @@ export const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
 
               {/* Today marker label */}
               {isToday && (
-                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                <span className="absolute top-1 right-1 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>

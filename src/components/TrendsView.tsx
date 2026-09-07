@@ -29,7 +29,7 @@ import {
   CheckCircle2,
   ShieldAlert,
 } from 'lucide-react';
-import { CATEGORY_COLORS, CATEGORY_NAMES, DailyGoalLog, Goal, UserConfig } from '../types';
+import { CATEGORY_COLORS, CATEGORY_NAMES, DailyGoalLog, Goal, UserConfig, DailyJournal } from '../types';
 import { calculateScoresForDate } from '../utils/scoring';
 import { calculateWillpowerAnalytics, formatTimelineDisplay } from '../utils/willpowerAnalytics';
 import { ConsistencyHeatmap } from './ConsistencyHeatmap';
@@ -40,6 +40,7 @@ interface TrendsViewProps {
   dailyLogs: DailyGoalLog[];
   todayStr: string;
   userConfig: UserConfig;
+  journals?: DailyJournal[];
 }
 
 export const TrendsView: React.FC<TrendsViewProps> = ({
@@ -47,6 +48,7 @@ export const TrendsView: React.FC<TrendsViewProps> = ({
   dailyLogs,
   todayStr,
   userConfig,
+  journals,
 }) => {
   const [rangeDays, setRangeDays] = useState<number>(30);
 
@@ -68,7 +70,7 @@ export const TrendsView: React.FC<TrendsViewProps> = ({
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
 
-    const result = calculateScoresForDate(dateStr, goals, dailyLogs, userConfig);
+    const result = calculateScoresForDate(dateStr, goals, dailyLogs, userConfig, journals);
 
     categoryChartData.push({
       date: dateStr.slice(5), // MM-DD
@@ -203,7 +205,7 @@ export const TrendsView: React.FC<TrendsViewProps> = ({
       {/* 90-Day Consistency Heatmap */}
       <ConsistencyHeatmap goals={goals} dailyLogs={dailyLogs} todayStr={todayStr} />
 
-      <WeeklyRecap goals={goals} dailyLogs={dailyLogs} userConfig={userConfig} todayStr={todayStr} />
+      <WeeklyRecap goals={goals} dailyLogs={dailyLogs} userConfig={userConfig} todayStr={todayStr} journals={journals} />
 
       <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-cyan-500/25 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

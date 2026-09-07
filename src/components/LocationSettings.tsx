@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ExternalLink, LocateFixed, MapPin, Navigation, ShieldCheck, X } from 'lucide-react';
 import { UserConfig } from '../types';
+import { requestAndGetDeviceLocation } from '../utils/nativePermissions';
 
 interface LocationSettingsProps {
   userConfig: UserConfig;
@@ -35,32 +36,24 @@ export const LocationSettings: React.FC<LocationSettingsProps> = ({ userConfig, 
     setStatus(cleanLabel ? 'Saved. NEXUS can use this as local context now.' : 'Location label cleared.');
   };
 
-  const useDeviceLocation = () => {
-    if (!navigator.geolocation) {
-      setStatus('This browser does not support device location.');
-      return;
+  const useDeviceLocation = async () => {
+    setStatus('Requesting location permission...');
+    const result = await requestAndGetDeviceLocation();
+    if (result.success && result.coords) {
+      onUpdateUserConfig({
+        ...userConfig,
+        locationOptIn: true,
+        locationLabel: label.trim() || userConfig.locationLabel,
+        coordinates: {
+          latitude: result.coords.latitude,
+          longitude: result.coords.longitude,
+          accuracy: result.coords.accuracy,
+        },
+      });
+      setStatus('Device location saved. Use a city label too if you want NEXUS to sound more local.');
+    } else {
+      setStatus(result.error || 'Location permission was blocked or unavailable. Manual city still works.');
     }
-
-    setStatus('Asking browser for location permission...');
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        onUpdateUserConfig({
-          ...userConfig,
-          locationOptIn: true,
-          locationLabel: label.trim() || userConfig.locationLabel,
-          coordinates: {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          },
-        });
-        setStatus('Device location saved. Use a city label too if you want NEXUS to sound more local.');
-      },
-      () => {
-        setStatus('Location permission was blocked or unavailable. Manual city still works.');
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 1000 * 60 * 30 }
-    );
   };
 
   const clearLocation = () => {

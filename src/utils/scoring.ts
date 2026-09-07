@@ -1,4 +1,4 @@
-import { CategoryKey, CategoryScores, DailyGoalLog, Goal, UserConfig } from '../types';
+import { CategoryKey, CategoryScores, DailyGoalLog, Goal, UserConfig, DailyJournal } from '../types';
 
 /**
  * Calculates consecutive completion days (streak) for a goal up to a target date.
@@ -120,7 +120,8 @@ export function calculateScoresForDate(
   targetDateStr: string,
   goals: Goal[],
   dailyLogs: DailyGoalLog[],
-  userConfig: UserConfig
+  userConfig: UserConfig,
+  journals?: DailyJournal[]
 ): ScoreCalculationResult {
   const activeGoals = goals.filter(
     (g) => !g.archived && g.priority !== 'parking_lot' && g.planStatus !== 'paused' && g.planStatus !== 'completed'
@@ -242,6 +243,78 @@ export function calculateScoresForDate(
       100,
       Math.max(0, spiritualBaseline * 0.4 + alignmentRatio * 45 + spiritualBonus)
     );
+  }
+
+  // 4. Journaling & NEXUS Reflection Impact:
+  // User's journal entries and mood directly modulate the 5 passive monitoring categories
+  if (journals && journals.length > 0) {
+    const journalForDate = journals.find((j) => j.date === targetDateStr);
+    if (journalForDate) {
+      // 4a. Mood scale (1-5) directly modulates happiness and selfCare
+      if (typeof journalForDate.mood === 'number') {
+        const mood = journalForDate.mood;
+        if (mood >= 5) {
+          rawScores.happiness += 10;
+          rawScores.selfCare += 6;
+          rawScores.spiritual += 4;
+        } else if (mood === 4) {
+          rawScores.happiness += 5;
+          rawScores.selfCare += 3;
+          rawScores.spiritual += 2;
+        } else if (mood === 2) {
+          rawScores.happiness -= 6;
+          rawScores.selfCare -= 3;
+        } else if (mood <= 1) {
+          rawScores.happiness -= 12;
+          rawScores.selfCare -= 6;
+        }
+      }
+
+      // 4b. Keyword sentiment & focus extraction from journal entry text
+      const entryText = (journalForDate.entry || '').toLowerCase();
+      if (entryText.length > 0) {
+        // Deliberate daily reflection affirms inner alignment and self-care
+        rawScores.spiritual += 3;
+        rawScores.selfCare += 2;
+
+        // Health keywords: workout, gym, run, sleep, nutrition, diet, walk, fitness
+        if (/\b(gym|workout|lift|run|running|sprint|cardio|walk|walking|sleep|slept|diet|nutrition|fasting|meal|protein|stretch|hydrate|water|recovery)\b/i.test(entryText)) {
+          rawScores.health += 8;
+        }
+
+        // Smarts keywords: study, read, book, learn, coding, code, analysis, research, course
+        if (/\b(study|studied|reading|read|book|books|learn|learning|coded|coding|program|math|research|paper|class|course|lesson|exam|skill|mastery|insight)\b/i.test(entryText)) {
+          rawScores.smarts += 8;
+        }
+
+        // Spiritual / Purpose keywords: meditate, prayer, gratitude, thankful, purpose, soul, aligned, life path
+        if (/\b(meditat|prayer|pray|gratitude|grateful|thankful|purpose|calling|aligned|life path|peace|presence|mindful|soul|destiny|vision)\b/i.test(entryText)) {
+          rawScores.spiritual += 8;
+        }
+
+        // Self-Care keywords: relax, unwind, rest, nature, boundaries, calm, recharge
+        if (/\b(relax|relaxed|unwind|rest|rested|massage|spa|nature|calm|recharge|reset|self-care|break|breathe|breathing|boundaries)\b/i.test(entryText)) {
+          rawScores.selfCare += 8;
+        }
+
+        // Happiness keywords: happy, joy, smile, laugh, love, blessed, excited, proud, celebrate
+        if (/\b(happy|joy|joyful|smile|smiled|laugh|laughed|love|loved|blessed|excited|excitement|proud|fulfill|celebrat|great day|awesome)\b/i.test(entryText)) {
+          rawScores.happiness += 8;
+        }
+
+        // Stress / Burnout signals: modulate downward to match genuine psychological state
+        if (/\b(exhausted|burnout|burned out|overwhelmed|stressed|anxious|anxiety|depressed|sad|drained)\b/i.test(entryText)) {
+          rawScores.happiness -= 5;
+          rawScores.selfCare -= 4;
+        }
+      }
+
+      // 4c. NEXUS AI coaching dialogue affirmed
+      if (journalForDate.aiReflection && journalForDate.aiReflection.length > 0) {
+        rawScores.smarts += 3;
+        rawScores.spiritual += 3;
+      }
+    }
   }
 
   // Clamp all scores between 0 and 100

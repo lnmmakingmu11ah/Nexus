@@ -337,7 +337,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                     <span>{mg.title}</span>
                     {mg.timelineEstimate && (
-                      <span className="text-[10px] text-zinc-500 font-mono">({mg.timelineEstimate})</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">
+                        ({mg.timelineEstimate.replace(/(\d+)\.(\d+)\s*(months?|mos?)/i, (_, w, d, u) => `~${Math.round(parseFloat(`${w}.${d}`))} ${u}`).replace(/(\d+)\.(\d{2,})\s*(years?|yrs?)/i, (_, w, d, u) => `~${parseFloat(`${w}.${d}`).toFixed(1)} ${u}`)})
+                      </span>
                     )}
                   </span>
                 ))}
@@ -1093,8 +1095,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           )}
                         </button>
 
-                        <div>
-                          <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                        <div className="min-w-0 flex-1">
+                          {/* Badges Row */}
+                          <div className="flex items-center space-x-1.5 flex-wrap gap-y-1 mb-1">
                             <span className="text-[9px] uppercase font-mono tracking-wider text-cyan-300 bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-500/30 flex items-center gap-1">
                               <Folder className="w-2.5 h-2.5 text-cyan-400" />
                               <span>{goal.folder || 'General'}</span>
@@ -1133,21 +1136,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                               </span>
                             )}
 
-                            <h4
-                              className={`text-xs font-semibold ${
-                                isCompleted ? 'line-through text-zinc-400' : 'text-zinc-100'
-                              }`}
-                            >
-                              {goal.name}
-                            </h4>
-
                             {/* Small '🔥' icon for goals with streak > 5 */}
                             {isFlameOver5 && (
                               <span
                                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30 animate-pulse"
                                 title="Current hot streak over 5 days! 🔥"
                               >
-                                <span className="text-xs leading-none animate-bounce">🔥</span>
+                                <span className="text-xs leading-none">🔥</span>
                                 <span>{streakInfo.streak}d</span>
                               </span>
                             )}
@@ -1158,26 +1153,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
                                 title="Lifetime best streak achieved! ⭐"
                               >
-                                <span className="text-xs leading-none animate-bounce">⭐</span>
+                                <span className="text-xs leading-none">⭐</span>
                                 <span>Best</span>
                               </span>
                             )}
                           </div>
+
+                          {/* Full-width Goal Title */}
+                          <h4
+                            className={`text-sm font-semibold leading-tight break-words ${
+                              isCompleted ? 'line-through text-zinc-400' : 'text-zinc-100'
+                            }`}
+                          >
+                            {goal.name}
+                          </h4>
+
                           <p className="text-[11px] text-zinc-400 font-light mt-0.5 line-clamp-2">
                             {goal.description}
                           </p>
 
                           {/* Tomorrow's Action Quick Preview Banner */}
                           <div className="mt-2.5 p-2 rounded-lg bg-zinc-950/80 border border-amber-500/25 flex items-center justify-between gap-2 hover:bg-amber-500/10 transition-colors">
-                            <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
                               <span className="text-[9px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
                                 Tomorrow’s Step
                               </span>
-                              <span className="text-[11px] text-zinc-300 font-medium truncate">
+                              <span className="text-[11px] text-zinc-300 font-medium break-words line-clamp-1">
                                 {tomorrowTaskMap[goal.id] || 'Deliberate practice & checkpoint'}
                               </span>
                             </div>
-                            <span className="text-[10px] font-bold text-amber-300 flex items-center gap-0.5 shrink-0">
+                            <span className="text-[10px] font-bold text-amber-300 flex items-center gap-0.5 shrink-0 ml-1">
                               Roadmap &rarr;
                             </span>
                           </div>
@@ -1255,7 +1260,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             }`}
                           >
                             {eff.weight >= 0 ? `+${eff.weight}` : eff.weight}{' '}
-                            {eff.category.slice(0, 3)}
+                            {CATEGORY_NAMES[eff.category] || eff.category}
                           </span>
                         ))}
                       </div>

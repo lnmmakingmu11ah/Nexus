@@ -64,10 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <header className="app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-amber-500/20 text-zinc-100 shadow-2xl shadow-black/80 will-change-transform">
-      {/* Top Golden Ambient Glow Line */}
-      <div className="h-[2px] w-full bg-gradient-to-r from-amber-500/70 via-emerald-400/80 to-amber-500/70 shadow-sm shadow-amber-500/20" />
-
+    <header className="app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/60 will-change-transform">
       <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-2">
           {/* Logo & Identity */}

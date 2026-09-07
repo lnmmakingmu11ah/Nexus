@@ -360,7 +360,7 @@ export const AdaptiveScheduler: React.FC<AdaptiveSchedulerProps> = ({
                                     key={i}
                                     className="px-1.5 py-0.5 rounded bg-zinc-950 font-mono text-emerald-400 border border-zinc-800"
                                   >
-                                    +{eff.weight} {eff.category.slice(0, 3)}
+                                    +{eff.weight} {CATEGORY_NAMES[eff.category] || eff.category}
                                   </span>
                                 ))}
                               </div>

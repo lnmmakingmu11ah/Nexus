@@ -25,6 +25,11 @@ import {
 } from 'lucide-react';
 import { DailyGoalLog, Goal, OpenMomentNotificationSettings, UserConfig } from '../types';
 import { ScoreCalculationResult } from '../utils/scoring';
+import {
+  checkNotificationPermission,
+  requestNotificationPermission,
+  sendLocalNotification,
+} from '../utils/nativePermissions';
 
 interface NexusNotificationCenterProps {
   goals: Goal[];
@@ -76,9 +81,7 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
     }
   });
   const [loadingAiNudge, setLoadingAiNudge] = useState<boolean>(false);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
-    typeof Notification !== 'undefined' ? Notification.permission : 'default'
-  );
+  const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'prompt' | 'default'>('prompt');
   const [nativeNotifiedIds, setNativeNotifiedIds] = useState<Set<string>>(new Set());
 
   const userName = userConfig.userName || 'Champ';
@@ -90,17 +93,23 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
   };
 
   useEffect(() => {
+    checkNotificationPermission().then((perm) => {
+      setNotificationPermission(perm);
+    });
+  }, []);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setClockTick(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
 
   const requestNativeNotifications = async () => {
-    if (typeof Notification === 'undefined') return;
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
-    if (permission === 'granted') {
-      new Notification('NEXUS alerts are on', {
-        body: 'Streak rescues and habit nudges can now show outside the app.',
+    const perm = await requestNotificationPermission();
+    setNotificationPermission(perm);
+    if (perm === 'granted') {
+      await sendLocalNotification({
+        title: 'NEXUS alerts are active',
+        body: 'Streak rescues and habit nudges can now show on your device.',
       });
     }
   };
@@ -308,22 +317,20 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
   }, [goals, dailyLogs, todayStr, scoreData.composite, userConfig.userName, userConfig.lifePathGoal, userConfig.openMomentNotifications, dismissedIds, clockTick]);
 
   useEffect(() => {
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    if (notificationPermission !== 'granted') return;
 
     const urgentNudges = nudges.filter((n) => n.type === 'priority' || n.type === 'decay' || n.type === 'open_moment' || n.aiGenerated);
     urgentNudges.forEach((nudge) => {
       if (nativeNotifiedIds.has(nudge.id)) return;
-      try {
-        new Notification(nudge.title, {
-          body: nudge.message,
-          tag: nudge.id,
-        });
-        setNativeNotifiedIds((prev) => new Set(prev).add(nudge.id));
-      } catch (e) {
-        console.error('Native nudge notification failed:', e);
-      }
+      sendLocalNotification({
+        title: nudge.title,
+        body: nudge.message,
+      }).catch((e) => {
+        console.warn('Native nudge notification failed:', e);
+      });
+      setNativeNotifiedIds((prev) => new Set(prev).add(nudge.id));
     });
-  }, [nudges, nativeNotifiedIds]);
+  }, [nudges, nativeNotifiedIds, notificationPermission]);
 
   const handleDismiss = (id: string) => {
     const updated = new Set(dismissedIds);
@@ -461,11 +468,11 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
             <span className="hidden sm:inline">Ask NEXUS</span>
           </button>
 
-          {typeof Notification !== 'undefined' && notificationPermission !== 'granted' && (
+          {notificationPermission !== 'granted' && (
             <button
               onClick={requestNativeNotifications}
-              className="flex items-center space-x-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs px-2.5 py-1.5 rounded-xl transition-all font-medium"
-              title="Allow native notifications for NEXUS alerts"
+              className="flex items-center space-x-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs px-2.5 py-1.5 rounded-xl transition-all font-medium cursor-pointer"
+              title="Allow notifications for NEXUS alerts"
             >
               <Bell className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Enable Alerts</span>

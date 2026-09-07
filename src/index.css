@@ -49,8 +49,8 @@ body,
 }
 
 .app-topbar-spacer {
-  /* h-16 (64px) + 2px glow line + safe-area */
-  height: calc(4rem + 2px + env(safe-area-inset-top, 0px));
+  /* h-16 (64px) + safe-area */
+  height: calc(4rem + env(safe-area-inset-top, 0px));
 }
 
 /* ── Tab / page transitions ────────────────────────────────────────────── */
