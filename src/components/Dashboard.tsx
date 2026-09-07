@@ -37,6 +37,8 @@ import {
   ListFilter,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   ArrowRight,
   Target,
   RefreshCw,
@@ -82,7 +84,6 @@ interface DashboardProps {
   onTriggerStreakToast?: (goalName: string, streakDays: number, msg?: string) => void;
   onUpdateUserConfig?: (updated: UserConfig) => void;
   onNavigateTab?: (tab: string) => void;
-  onOpenLaunchpad?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -101,10 +102,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onTriggerStreakToast,
   onUpdateUserConfig,
   onNavigateTab,
-  onOpenLaunchpad,
 }) => {
 
   const [activePathwayGoal, setActivePathwayGoal] = useState<Goal | null>(null);
+  const [selectedMissionGoalId, setSelectedMissionGoalId] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterFolder, setFilterFolder] = useState<string>('all');
   const [filterStreak, setFilterStreak] = useState<'all' | 'over5' | 'best'>('all');
@@ -252,39 +253,111 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const completedTodayCount = activeGoals.filter((g) => logsTodayMap.get(g.id)?.completed).length;
   const pendingMissionGoals = activeGoals.filter((g) => !logsTodayMap.get(g.id)?.completed);
-  const priorityMissionGoal =
-    pendingMissionGoals.find((g) => (g.priority || 'active') === 'active') ||
-    pendingMissionGoals.find((g) => (g.priority || 'active') === 'maintenance') ||
-    pendingMissionGoals[0];
+  const candidateMissionGoals = pendingMissionGoals.length > 0 ? pendingMissionGoals : activeGoals;
+  
+  const missionIndex = Math.max(
+    0,
+    candidateMissionGoals.findIndex((g) => g.id === selectedMissionGoalId)
+  );
+  const currentMissionGoal = candidateMissionGoals[missionIndex] || candidateMissionGoals[0];
+
+  const handlePrevMissionGoal = () => {
+    if (candidateMissionGoals.length <= 1) return;
+    const prevIndex = (missionIndex - 1 + candidateMissionGoals.length) % candidateMissionGoals.length;
+    setSelectedMissionGoalId(candidateMissionGoals[prevIndex].id);
+  };
+
+  const handleNextMissionGoal = () => {
+    if (candidateMissionGoals.length <= 1) return;
+    const nextIndex = (missionIndex + 1) % candidateMissionGoals.length;
+    setSelectedMissionGoalId(candidateMissionGoals[nextIndex].id);
+  };
+
   const missionPercent = activeGoals.length > 0 ? Math.round((completedTodayCount / activeGoals.length) * 100) : 0;
   const nexusPoints = calculateNexusPoints(goals, dailyLogs, todayStr, userConfig);
 
   return (
     <div className="space-y-6 sm:space-y-8">
       <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-emerald-500/25 rounded-2xl p-4 sm:p-5 shadow-2xl shadow-emerald-950/20 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Target className="w-4 h-4 text-emerald-400" />
-            <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-300">Today's Mission</span>
+        <div className="space-y-3 flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Target className="w-4 h-4 text-emerald-400" />
+              <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-300 font-bold">Today's Mission</span>
+              {candidateMissionGoals.length > 1 && (
+                <div className="flex items-center bg-zinc-950/90 border border-emerald-500/30 rounded-lg px-1.5 py-0.5 gap-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={handlePrevMissionGoal}
+                    className="p-1 hover:text-emerald-300 text-zinc-400 hover:bg-zinc-850 rounded transition-colors"
+                    title="Previous Goal"
+                    aria-label="Previous Goal"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] font-mono font-bold text-emerald-300 px-1">
+                    {missionIndex + 1} of {candidateMissionGoals.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextMissionGoal}
+                    className="p-1 hover:text-emerald-300 text-zinc-400 hover:bg-zinc-850 rounded transition-colors"
+                    title="Next Goal"
+                    aria-label="Next Goal"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               type="button"
-              onClick={() => priorityMissionGoal ? onToggleGoal(priorityMissionGoal.id) : onOpenAddGoal()}
-              className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-lg"
+              onClick={() => currentMissionGoal ? onToggleGoal(currentMissionGoal.id) : onOpenAddGoal()}
+              className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-500/10 border border-amber-500/25 px-2.5 py-0.5 rounded-lg font-semibold"
             >
               What should I do next?
             </button>
           </div>
+
+          {/* Interactive Goal Switcher Chips */}
+          {candidateMissionGoals.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-0.5">
+              {candidateMissionGoals.map((g, idx) => {
+                const isSelected = currentMissionGoal?.id === g.id;
+                const isDone = logsTodayMap.get(g.id)?.completed;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setSelectedMissionGoalId(g.id)}
+                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/50 shadow-sm shadow-emerald-950/40 ring-1 ring-emerald-500/30'
+                        : isDone
+                          ? 'bg-zinc-900/50 text-zinc-500 border border-zinc-850 line-through'
+                          : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-emerald-400' : isDone ? 'bg-zinc-600' : 'bg-amber-400'}`} />
+                    <span className="truncate max-w-[130px]">{g.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-white leading-snug">
-              {priorityMissionGoal ? priorityMissionGoal.name : 'Set one real move for today'}
+              {currentMissionGoal ? currentMissionGoal.name : 'Set one real move for today'}
             </h2>
             <p className="text-xs text-zinc-400 mt-1 max-w-2xl">
-              {priorityMissionGoal
-                ? priorityMissionGoal.description || 'One clean completion keeps the system honest.'
+              {currentMissionGoal
+                ? currentMissionGoal.description || 'One clean completion keeps the system honest.'
                 : 'Create a goal or open the AI planner when you are ready to give NEXUS something concrete to track.'}
             </p>
           </div>
         </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 min-w-full lg:min-w-[480px]">
           <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3">
             <p className="text-[10px] text-zinc-500 uppercase font-mono">Progress</p>
@@ -310,10 +383,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
           <button
             type="button"
-            onClick={() => priorityMissionGoal ? onToggleGoal(priorityMissionGoal.id) : onOpenAddGoal()}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl p-3 flex items-center justify-center gap-1.5 text-xs font-semibold transition-colors"
+            onClick={() => {
+              if (currentMissionGoal) {
+                onToggleGoal(currentMissionGoal.id);
+                // If there are other pending goals, automatically cycle to the next one
+                const remaining = candidateMissionGoals.filter((g) => g.id !== currentMissionGoal.id);
+                if (remaining.length > 0) {
+                  setSelectedMissionGoalId(remaining[0].id);
+                }
+              } else {
+                onOpenAddGoal();
+              }
+            }}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl p-3 flex items-center justify-center gap-1.5 text-xs font-semibold transition-colors cursor-pointer active:scale-95 shadow-md shadow-emerald-950/40"
           >
-            <span>{priorityMissionGoal ? 'Mark Done' : 'Add Goal'}</span>
+            <span>{currentMissionGoal ? 'Mark Done' : 'Add Goal'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -362,19 +446,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-            {onOpenLaunchpad && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenLaunchpad();
-                }}
-                className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-semibold rounded-xl border border-amber-500/30 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
-              >
-                <span>🌅</span>
-                <span>Launchpad</span>
-              </button>
-            )}
             {onNavigateTab && (
               <button
                 type="button"

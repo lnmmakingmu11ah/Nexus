@@ -797,7 +797,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
       {/* TAB 1: MASTER BLUEPRINT & TIMELINES */}
       {activeTab === 'blueprint' && (
-        <div className="space-y-6 pt-4 px-0">
+        <div className="space-y-6 pt-4 px-3 sm:px-6 pb-nav">
           {userConfig.adaptiveWarnings && userConfig.adaptiveWarnings.length > 0 && (
             <div className="bg-zinc-950 border border-amber-500/25 rounded-2xl p-4 space-y-2">
               <h3 className="text-xs font-bold text-amber-300 uppercase tracking-wider">Timeline shifts</h3>
@@ -1515,7 +1515,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
 
       {/* TAB 2: NEXUS CHAT — Full-page ChatGPT style */}
       {activeTab === 'chat' && (
-        <div className="flex flex-col bg-black" style={{ minHeight: 'calc(100vh - 56px)' }}>
+        <div className="flex flex-col h-[calc(100dvh-4rem-env(safe-area-inset-top,0px)-49px)] sm:h-[calc(100vh-4rem-env(safe-area-inset-top,0px)-49px)] bg-black overflow-hidden">
 
           {/* Offline / Error Banners */}
           {brainOffline && (
@@ -1581,7 +1581,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
           </div>
 
           {/* ─── Input Bar ─── */}
-          <div className="shrink-0 border-t border-zinc-800/60 bg-black px-4 pt-3 pb-4 space-y-2">
+          <div className="shrink-0 border-t border-zinc-800/60 bg-black px-4 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] space-y-2">
             {/* Quick-action chip */}
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
               <button

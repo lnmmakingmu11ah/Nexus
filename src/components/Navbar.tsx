@@ -1,4 +1,4 @@
-import React, { ReactNode, useRef, useState } from 'react';
+import React, { ReactNode, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ShieldCheck, Download, Upload, Flame, RefreshCw, EyeOff, Settings, X, Check, Trophy } from 'lucide-react';
 import { CATEGORY_COLORS, CATEGORY_NAMES, CategoryKey, UserConfig } from '../types';
@@ -32,6 +32,28 @@ export const Navbar: React.FC<NavbarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [copiedNotification, setCopiedNotification] = useState(false);
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      if (currentScrollY <= 25) {
+        // At or reached the very top of the page -> always show
+        setIsHeaderHidden(false);
+      } else if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+        // Scrolling down -> hide upwards
+        setIsHeaderHidden(true);
+      } else if (currentScrollY <= 40) {
+        // Scrolled all the way back up to the top -> re-pop up
+        setIsHeaderHidden(false);
+      }
+      lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleAnonymizeClick = () => {
     onAnonymizeExport();
@@ -65,7 +87,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <header className="app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/60 will-change-transform">
+    <header className={`app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/60 will-change-transform transition-transform duration-300 ease-in-out ${isHeaderHidden ? '-translate-y-full' : 'translate-y-0'}`}>
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 relative">
           {/* Left spacer for perfect geometric center balance */}

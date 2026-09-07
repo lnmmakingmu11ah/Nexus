@@ -23,7 +23,6 @@ import { LocationSettings } from './components/LocationSettings';
 import { AiServerSettings } from './components/AiServerSettings';
 import { PlanReviewModal } from './components/PlanReviewModal';
 import { HabitStackPrompt } from './components/HabitStackPrompt';
-import { MorningLaunchpad, useMorningLaunchpad } from './components/MorningLaunchpad';
 import { RescueHabitPrompt } from './components/RescueHabitPrompt';
 import { ShareableRecapCard } from './components/ShareableRecapCard';
 import { triggerHapticFeedback } from './utils/haptics';
@@ -133,9 +132,6 @@ export default function App() {
 
   // Share recap card visibility
   const [showShareCard, setShowShareCard] = useState(false);
-
-  // Morning launchpad modal state
-  const { showLaunchpad, openLaunchpad, dismissLaunchpad } = useMorningLaunchpad(goals, todayStr);
 
   // Initialize native status bar style and color on device mount
   // Register notification deep-link tap listener
@@ -1076,7 +1072,7 @@ export default function App() {
 
 
       {/* Main Content Area */}
-      <main key={currentTab} className="nexus-page-enter max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 pb-nav">
+      <main key={currentTab} className={`nexus-page-enter max-w-7xl mx-auto ${currentTab === 'aicoach' ? 'px-0 py-0 pb-0' : 'px-3 sm:px-6 lg:px-8 py-4 pb-nav'}`}>
         {currentTab === 'dashboard' && (
           <Dashboard
             scoreData={scoreData}
@@ -1098,7 +1094,6 @@ export default function App() {
             onTriggerStreakToast={triggerStreakToast}
             onUpdateUserConfig={handleUpdateUserConfig}
             onNavigateTab={handleNavigateTab}
-            onOpenLaunchpad={openLaunchpad}
           />
         )}
 
@@ -1301,19 +1296,6 @@ export default function App() {
 
       {/* Streak Milestone Toast Notifications */}
       <StreakToastContainer toasts={streakToasts} onDismiss={handleDismissToast} />
-
-      {/* Morning Launchpad — daily first-open modal */}
-      <AnimatePresence>
-        {showLaunchpad && (
-          <MorningLaunchpad
-            goals={goals}
-            dailyLogs={dailyLogs}
-            todayStr={todayStr}
-            userName={userConfig.userName}
-            onClose={dismissLaunchpad}
-          />
-        )}
-      </AnimatePresence>
 
       {/* Weekly Shareable Recap Card */}
       {showShareCard && (

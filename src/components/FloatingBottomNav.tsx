@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   BookOpen,
@@ -23,6 +23,59 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
   setCurrentTab,
 }) => {
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastScrollY = useRef(0);
+
+  const resetInactivityTimer = (delayMs = 3500) => {
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    inactivityTimer.current = setTimeout(() => {
+      setIsVisible(false);
+    }, delayMs);
+  };
+
+  // When user enters another page, briefly show active tab then auto-hide downwards
+  useEffect(() => {
+    setIsVisible(true);
+    resetInactivityTimer(1500);
+  }, [currentTab]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      
+      if (currentScrollY <= 25) {
+        // Scrolled all the way up and reached the top -> bring back up!
+        setIsVisible(true);
+        resetInactivityTimer(3500);
+      } else if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+        // Scrolling down -> hide downwards immediately
+        setIsVisible(false);
+        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+      } else if (currentScrollY <= 40) {
+        // Reached near top
+        setIsVisible(true);
+        resetInactivityTimer(3500);
+      }
+      lastScrollY.current = currentScrollY;
+    };
+
+    const handleUserInteraction = () => {
+      setIsVisible(true);
+      resetInactivityTimer(3500);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('touchstart', handleUserInteraction, { passive: true });
+    window.addEventListener('click', handleUserInteraction, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('touchstart', handleUserInteraction);
+      window.removeEventListener('click', handleUserInteraction);
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    };
+  }, []);
 
   const primaryNavItems = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
@@ -145,7 +198,11 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
 
       {/* Main 5-Slot Bottom Floating Bar */}
       <div
-        className="fixed left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-40 md:hidden"
+        className={`fixed left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-40 md:hidden transition-all duration-300 ease-in-out ${
+          isVisible || showMoreDrawer
+            ? 'translate-y-0 opacity-100 pointer-events-auto'
+            : 'translate-y-28 opacity-0 pointer-events-none'
+        }`}
         style={{ bottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
       >
         <nav className="bg-zinc-950/95 backdrop-blur-2xl border border-amber-500/30 rounded-2xl p-1 shadow-2xl shadow-black/90 flex items-center justify-between ring-1 ring-amber-500/20">
