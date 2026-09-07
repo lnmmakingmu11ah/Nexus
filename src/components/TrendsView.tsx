@@ -643,9 +643,11 @@ export const TrendsView: React.FC<TrendsViewProps> = ({
       </div>
 
       {/* Extended Absence Rules Explanation Card */}
-      <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 shadow-lg space-y-2">
-        <div className="flex items-center space-x-2 text-rose-400">
-          <AlertTriangle className="w-5 h-5" />
+      <div className="bg-gradient-to-br from-zinc-950/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-amber-500/25 hover:border-amber-400/40 rounded-2xl p-5 shadow-2xl space-y-3 transition-all duration-300">
+        <div className="flex items-center space-x-2.5">
+          <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 shrink-0">
+            <AlertTriangle className="w-4 h-4" />
+          </div>
           <h3 className="text-sm font-semibold text-white">Extended Absence & Decay Rules</h3>
         </div>
         <p className="text-xs text-zinc-300 leading-relaxed font-light">

@@ -89,7 +89,7 @@ body,
 /* ── Bottom nav clearance ──────────────────────────────────────────────── */
 /* Extra padding so content never hides under the floating nav pill */
 .pb-nav {
-  padding-bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(11.5rem + env(safe-area-inset-bottom, 24px));
 }
 
 /* ── iOS momentum scroll ───────────────────────────────────────────────── */

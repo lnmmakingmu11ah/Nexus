@@ -66,21 +66,31 @@ export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
     hour < 12 ? '🌅 Good morning' : hour < 18 ? '☀️ Good afternoon' : '🌙 Good evening';
 
   return (
-    <AnimatePresence>
-      <div
-        onClick={onClose}
-        className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-3 py-4 cursor-pointer"
-      >
+    <>
+      {/* Backdrop overlay */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-md cursor-pointer"
+      />
+
+      {/* Dialog container */}
+      <div className="fixed inset-0 z-[201] flex items-end sm:items-center justify-center p-3 sm:p-4 pointer-events-none">
         <motion.div
-          onClick={(e) => e.stopPropagation()}
-          initial={{ y: 40, opacity: 0.8, scale: 0.98 }}
+          initial={{ y: 50, opacity: 0, scale: 0.96 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
-          exit={{ y: 40, opacity: 0, scale: 0.98 }}
-          transition={{ duration: 0.2 }}
-          className="relative w-full max-w-sm bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/30 rounded-3xl shadow-2xl overflow-hidden cursor-default"
+          exit={{ y: 50, opacity: 0, scale: 0.96 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+          className="pointer-events-auto relative w-full max-w-sm bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-amber-500/40 rounded-3xl shadow-2xl overflow-hidden cursor-default"
         >
           {/* Glow accent */}
-          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-32 rounded-full bg-amber-400/10 blur-3xl pointer-events-none" />
+          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-32 rounded-full bg-amber-400/15 blur-3xl pointer-events-none" />
 
           {/* Header */}
           <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-zinc-800/60">
@@ -92,8 +102,11 @@ export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
               </div>
             </div>
             <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
               aria-label="Close launchpad"
             >
               <X className="w-4 h-4" />
@@ -154,14 +167,17 @@ export const MorningLaunchpad: React.FC<MorningLaunchpadProps> = ({
           {/* CTA */}
           <div className="px-5 pb-5">
             <button
-              onClick={onClose}
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-emerald-500 text-black font-extrabold text-sm tracking-wide shadow-lg shadow-amber-500/30 hover:opacity-90 transition-opacity active:scale-95"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-emerald-500 text-black font-extrabold text-sm tracking-wide shadow-lg shadow-amber-500/30 hover:opacity-90 transition-opacity active:scale-95 cursor-pointer"
             >
               🚀 Let's Conquer Today
             </button>
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </>
   );
 };

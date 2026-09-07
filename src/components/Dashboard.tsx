@@ -58,7 +58,6 @@ import {
 } from '../types';
 import { ScoreCalculationResult, calculateGoalBestStreak } from '../utils/scoring';
 import { MonthlyCalendar } from './MonthlyCalendar';
-import { DailyIntention } from './DailyIntention';
 import { evaluateBadges } from '../utils/badges';
 import { calculateNexusPoints } from '../utils/gamification';
 import { DailyJournal } from '../types';
@@ -356,8 +355,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {onOpenLaunchpad && (
               <button
                 type="button"
-                onClick={onOpenLaunchpad}
-                className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-semibold rounded-xl border border-amber-500/30 transition-colors flex items-center gap-1.5 shadow-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenLaunchpad();
+                }}
+                className="px-3 py-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-semibold rounded-xl border border-amber-500/30 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
               >
                 <span>🌅</span>
                 <span>Launchpad</span>
@@ -366,8 +368,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {onNavigateTab && (
               <button
                 type="button"
-                onClick={() => onNavigateTab('aicoach')}
-                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl border border-zinc-700 transition-colors flex items-center gap-1"
+                onClick={() => onNavigateTab('blueprint')}
+                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl border border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer active:scale-95"
               >
                 <span>View Blueprint</span>
                 <ArrowRight className="w-3 h-3 text-amber-400" />
@@ -446,19 +448,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </ResponsiveContainer>
           </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 pt-3 border-t border-zinc-800/60 text-center">
-            {(Object.keys(CATEGORY_NAMES) as CategoryKey[]).map((catKey) => {
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-zinc-800/60 text-center">
+            {(Object.keys(CATEGORY_NAMES) as CategoryKey[]).map((catKey, idx) => {
               const score = scoreData.scores[catKey];
               const decay = scoreData.absenceDecays[catKey];
               return (
                 <div
                   key={catKey}
-                  className="bg-zinc-950/80 p-2.5 rounded-xl border border-zinc-800/80 flex flex-col items-center justify-between shadow-sm"
+                  className={`bg-zinc-950/80 p-2.5 rounded-xl border border-zinc-800/80 hover:border-amber-500/30 flex flex-col items-center justify-between shadow-sm transition-colors ${
+                    idx === 4 ? 'col-span-2 sm:col-span-1' : ''
+                  }`}
                 >
-                  <div className="flex items-center space-x-1 mb-1">
+                  <div className="flex items-center space-x-1.5 mb-1">
                     {getCategoryIcon(catKey)}
-                    <span className="text-[10px] text-zinc-400 font-medium truncate max-w-[60px]">
-                      {CATEGORY_NAMES[catKey].split(' ')[0]}
+                    <span className="text-[11px] text-zinc-300 font-medium">
+                      {CATEGORY_NAMES[catKey]}
                     </span>
                   </div>
                   <span className="text-sm font-mono font-bold text-zinc-100">{score}%</span>
@@ -557,10 +561,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Daily Intention & Focus Reset (Positioned below Category Balance Matrix graph) */}
-      <DailyIntention todayStr={todayStr} userConfig={userConfig} />
-
       {/* Today's Goal Checklist Section */}
+
       <div className="bg-gradient-to-br from-zinc-950/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-amber-500/25 hover:border-amber-400/40 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 transition-all duration-300">
         {/* Personal Momentum Highlights Banner */}
         <div className="mb-5 grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3.5 bg-zinc-950/90 border border-zinc-800/80 rounded-xl">
@@ -955,14 +957,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             {/* Tomorrow's Step Quick Preview Banner */}
                             <div className="mt-2 p-1.5 rounded-lg bg-zinc-950/80 border border-amber-500/25 flex items-center justify-between gap-1.5 hover:bg-amber-500/10 transition-colors">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-[8px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1 py-0.2 rounded border border-amber-500/30 shrink-0">
-                                  Tomorrow
+                                <span className="text-[8px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded border border-amber-500/30 shrink-0 whitespace-nowrap">
+                                  Tomorrow's Step
                                 </span>
                                 <span className="text-[10px] text-zinc-300 font-medium truncate">
                                   {tomorrowTaskMap[goal.id] || 'Deliberate practice step'}
                                 </span>
                               </div>
-                              <span className="text-[9px] font-bold text-amber-300 flex items-center gap-0.5 shrink-0">
+                              <span className="text-[9px] font-bold text-amber-300 flex items-center gap-0.5 shrink-0 whitespace-nowrap">
                                 Plan &rarr;
                               </span>
                             </div>
@@ -1203,24 +1205,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <p className="text-[11px] text-zinc-400 font-light mt-0.5 line-clamp-2">
                             {goal.description}
                           </p>
-
-                          {/* Tomorrow's Action Quick Preview Banner */}
-                          <div className="mt-2.5 p-2 rounded-lg bg-zinc-950/80 border border-amber-500/25 hover:bg-amber-500/10 transition-colors">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-[9px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30">
-                                Tomorrow's Step
-                              </span>
-                              <span className="text-[10px] font-bold text-amber-300">
-                                Roadmap &rarr;
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-zinc-300 font-medium leading-tight line-clamp-2">
-                              {tomorrowTaskMap[goal.id] || 'Deliberate practice & checkpoint'}
-                            </p>
-                          </div>
                         </div>
                       </div>
-
 
                       {/* Streak Badge Component */}
                       <div className="flex flex-col items-end shrink-0">
@@ -1252,6 +1238,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           {streakInfo.multiplier}x boost
                         </span>
                       </div>
+                    </div>
+
+                    {/* Tomorrow's Action Quick Preview Banner (Full-width row) */}
+                    <div className="mt-3 p-2.5 rounded-xl bg-zinc-950/90 border border-amber-500/25 hover:border-amber-400/40 hover:bg-amber-500/5 transition-all">
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        <span className="text-[9px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 whitespace-nowrap shrink-0">
+                          Tomorrow's Step
+                        </span>
+                        <span className="text-[10px] font-bold text-amber-300 whitespace-nowrap shrink-0">
+                          Roadmap &rarr;
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-300 font-medium leading-relaxed">
+                        {tomorrowTaskMap[goal.id] || 'Deliberate practice & checkpoint'}
+                      </p>
                     </div>
                   </div>
 

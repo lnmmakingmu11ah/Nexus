@@ -58,7 +58,10 @@ interface AICoachViewProps {
   todayStr?: string;
   plannedTasks?: PlannedTask[];
   milestones?: Milestone[];
+  initialTab?: 'blueprint' | 'chat';
 }
+
+
 
 function parseAndExecuteAction(
   rawText: string,
@@ -230,8 +233,16 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
   todayStr = new Date().toISOString().split('T')[0],
   plannedTasks = [],
   milestones = [],
+  initialTab = 'chat',
 }) => {
-  const [activeTab, setActiveTab] = useState<'blueprint' | 'chat'>('chat');
+  const [activeTab, setActiveTab] = useState<'blueprint' | 'chat'>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   const [chatMessages, setChatMessages] = useState<AIChatMessage[]>(
     userConfig.aiChatHistory && userConfig.aiChatHistory.length > 0
       ? userConfig.aiChatHistory

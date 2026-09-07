@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { AnimatePresence } from 'motion/react';
 import { Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { FloatingBottomNav } from './components/FloatingBottomNav';
@@ -86,7 +87,23 @@ import { ensureTasksForGoals } from './utils/goalPathways';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [aiCoachSubTab, setAiCoachSubTab] = useState<'blueprint' | 'chat'>('chat');
   const [todayStr] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  const handleNavigateTab = (tab: string) => {
+    if (tab === 'blueprint') {
+      setAiCoachSubTab('blueprint');
+      setCurrentTab('aicoach');
+      return;
+    }
+    if (tab === 'aicoach') {
+      setAiCoachSubTab('chat');
+      setCurrentTab('aicoach');
+      return;
+    }
+    setCurrentTab(tab);
+  };
+
 
   // Persistent States
   const [userConfig, setUserConfig] = useState<UserConfig>(() => {
@@ -1080,7 +1097,7 @@ export default function App() {
             }}
             onTriggerStreakToast={triggerStreakToast}
             onUpdateUserConfig={handleUpdateUserConfig}
-            onNavigateTab={(tab) => setCurrentTab(tab)}
+            onNavigateTab={handleNavigateTab}
             onOpenLaunchpad={openLaunchpad}
           />
         )}
@@ -1099,10 +1116,11 @@ export default function App() {
         {currentTab === 'aicoach' && (
           <AICoachView
             userConfig={userConfig}
+            initialTab={aiCoachSubTab}
             onUpdateUserConfig={handleUpdateUserConfig}
             onAddGoals={handleBatchAddGoals}
             onToggleGoal={handleToggleGoal}
-            onNavigateTab={(tab) => setCurrentTab(tab as any)}
+            onNavigateTab={handleNavigateTab}
             onSaveJournal={handleSaveJournal}
             onRerunGoalScout={handleRerunGoalScout}
             onOpenPlanReview={
@@ -1296,14 +1314,16 @@ export default function App() {
       <StreakToastContainer toasts={streakToasts} onDismiss={handleDismissToast} />
 
       {/* Morning Launchpad — daily first-open modal */}
-      {showLaunchpad && (
-        <MorningLaunchpad
-          goals={goals}
-          todayStr={todayStr}
-          userName={userConfig.userName}
-          onClose={dismissLaunchpad}
-        />
-      )}
+      <AnimatePresence>
+        {showLaunchpad && (
+          <MorningLaunchpad
+            goals={goals}
+            todayStr={todayStr}
+            userName={userConfig.userName}
+            onClose={dismissLaunchpad}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Weekly Shareable Recap Card */}
       {showShareCard && (

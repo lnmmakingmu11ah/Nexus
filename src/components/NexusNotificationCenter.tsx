@@ -595,31 +595,23 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, height: 0 }}
-                      className={`p-3.5 rounded-xl border transition-all duration-200 relative group flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                        nudge.type === 'priority'
-                          ? 'bg-amber-950/20 border-amber-500/40 hover:border-amber-400/60'
-                          : nudge.type === 'decay'
-                          ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-400/60'
-                          : nudge.type === 'win'
-                          ? 'bg-emerald-950/20 border-emerald-500/40 hover:border-emerald-400/60'
-                          : 'bg-zinc-950/80 border-zinc-800/80 hover:border-zinc-700'
-                      }`}
+                      className="p-3.5 rounded-xl border border-amber-500/30 hover:border-amber-400/50 bg-gradient-to-br from-zinc-950/95 via-zinc-900/90 to-black/95 shadow-lg shadow-black/50 transition-all duration-200 relative group flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     >
                       <div className="flex items-start space-x-3">
-                        <div className="mt-0.5 p-2 rounded-lg bg-zinc-900 border border-zinc-800 flex-shrink-0">
+                        <div className="mt-0.5 p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 flex-shrink-0 shadow-sm">
                           {getTypeIcon(nudge.type)}
                         </div>
 
                         <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                             <span className="text-xs font-bold text-white tracking-tight">
                               {nudge.title}
                             </span>
-                            <span className="text-[10px] text-zinc-400 font-mono px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800">
+                            <span className="text-[10px] text-amber-300 font-mono px-2 py-0.5 rounded-full bg-zinc-900/90 border border-amber-500/30">
                               {nudge.timeContext}
                             </span>
                             {nudge.aiGenerated && (
-                              <span className="text-[9px] font-semibold text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded-md border border-amber-500/30">
+                              <span className="text-[9px] font-semibold text-amber-300 bg-amber-500/20 px-1.5 py-0.5 rounded-md border border-amber-500/40">
                                 AI Generated
                               </span>
                             )}
@@ -630,7 +622,7 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
                           </p>
 
                           <div className="flex items-center space-x-2 text-[10px] text-zinc-500">
-                            <Clock className="w-3 h-3 text-zinc-500" />
+                            <Clock className="w-3 h-3 text-amber-400/70" />
                             <span>{nudge.timestamp}</span>
                             <span>•</span>
                             <span className="text-amber-400/90 font-medium">NEXUS Companion</span>
@@ -643,10 +635,10 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
                         {nudge.goalId && (
                           <button
                             onClick={() => onToggleGoal(nudge.goalId!)}
-                            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm ${
+                            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm cursor-pointer active:scale-95 ${
                               isGoalCompletedToday
                                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                : 'bg-emerald-500 text-black hover:bg-emerald-400 font-bold'
+                                : 'bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black font-extrabold shadow-amber-500/20'
                             }`}
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -657,7 +649,7 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
                         {onNavigateTab && (
                           <button
                             onClick={() => onNavigateTab('aicoach')}
-                            className="flex items-center space-x-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs px-2.5 py-1.5 rounded-xl transition-colors"
+                            className="flex items-center space-x-1 bg-zinc-900 hover:bg-zinc-800 border border-amber-500/25 text-zinc-300 hover:text-white text-xs px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer active:scale-95"
                             title="Chat with NEXUS about this habit"
                           >
                             <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
@@ -667,7 +659,7 @@ export const NexusNotificationCenter: React.FC<NexusNotificationCenterProps> = (
 
                         <button
                           onClick={() => handleDismiss(nudge.id)}
-                          className="p-1.5 text-zinc-500 hover:text-rose-400 bg-zinc-900/60 border border-zinc-800 rounded-lg transition-colors"
+                          className="p-1.5 text-zinc-500 hover:text-rose-400 bg-zinc-900/60 border border-zinc-800 hover:border-zinc-700 rounded-lg transition-colors cursor-pointer"
                           title="Dismiss Nudge"
                         >
                           <X className="w-3.5 h-3.5" />

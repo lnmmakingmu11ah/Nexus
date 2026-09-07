@@ -109,29 +109,32 @@ export const RescueHabitPrompt: React.FC<RescueHabitPromptProps> = ({
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative rounded-2xl border border-rose-500/30 bg-gradient-to-r from-rose-950/60 via-zinc-900/80 to-zinc-950/80 p-4 overflow-hidden"
+              className="relative rounded-2xl border border-amber-500/35 hover:border-amber-400/50 bg-gradient-to-br from-zinc-950/95 via-zinc-900/90 to-black/95 p-4 sm:p-5 shadow-2xl shadow-black/80 overflow-hidden transition-all duration-300"
             >
-              {/* Pulse accent */}
-              <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-rose-500/10 blur-2xl pointer-events-none" />
+              {/* Golden amber pulse accent */}
+              <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-amber-500/15 blur-2xl pointer-events-none" />
 
               <button
                 onClick={() => handleDismiss(goal.id)}
-                className="absolute top-2.5 right-2.5 p-1 rounded-lg bg-zinc-800/80 text-zinc-500 hover:text-white transition-colors"
+                className="absolute top-3 right-3 p-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors cursor-pointer"
+                aria-label="Dismiss rescue habit prompt"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
 
               <div className="flex items-start gap-3 pr-6">
-                <div className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 shrink-0 mt-0.5">
-                  <ShieldAlert className="w-4 h-4 text-rose-400" />
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/35 text-amber-400 shrink-0 mt-0.5 shadow-sm">
+                  <ShieldAlert className="w-4 h-4 text-amber-400 animate-pulse" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                    <span className="text-[10px] font-mono font-bold uppercase text-rose-400 tracking-wider">Streak at risk</span>
-                    <span className="text-[10px] font-mono text-zinc-500">· {missed} days missed</span>
+                    <span className="text-[10px] font-mono font-bold uppercase text-amber-400 tracking-wider bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded-full">
+                      Streak at risk
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400">· {missed} days missed</span>
                   </div>
                   <p className="text-sm font-semibold text-white truncate">{goal.name}</p>
-                  <div className="mt-2 flex items-start gap-1.5">
+                  <div className="mt-2.5 p-2 rounded-xl bg-zinc-950/80 border border-amber-500/20 flex items-start gap-2">
                     <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                     <p className="text-[11px] text-zinc-300 leading-snug">{microHabit}</p>
                   </div>
@@ -147,10 +150,10 @@ export const RescueHabitPrompt: React.FC<RescueHabitPromptProps> = ({
                 ) : (
                   <button
                     onClick={() => handleAccept(goal.id)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-colors shadow-md shadow-amber-500/30 active:scale-95"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black text-xs font-extrabold transition-all shadow-md shadow-amber-500/25 active:scale-95 cursor-pointer"
                   >
                     <span>✅ Do 2-min version</span>
-                    <ChevronRight className="w-3 h-3" />
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
