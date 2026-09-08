@@ -195,7 +195,9 @@ async function startServer() {
       if (!res.headersSent) {
         return res.status(500).json({ error: err.message || 'AI service error' });
       }
-      res.write(`data: ${JSON.stringify({ type: 'error', error: err.message || 'AI service error' })}\n\n`);
+      const fallbackText = "hey i'm right here! tell me more about what you're thinking.";
+      res.write(`data: ${JSON.stringify({ type: 'delta', text: fallbackText })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'done', reply: fallbackText, messages: [fallbackText] })}\n\n`);
       return res.end();
     }
   };

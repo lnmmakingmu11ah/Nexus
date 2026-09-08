@@ -376,7 +376,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
       const liveId = `ai-live-${Date.now()}`;
       const res = await aiClient.chatCompanionStream(
         {
-          messages: apiMessages,
+          messages: apiMessages.slice(-20),
           nexusPersona: ensureNexusPersona(userConfig.nexusPersona),
           userContext: {
 
@@ -484,62 +484,70 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
       };
       onUpdateUserConfig(configWithHistory);
 
-      Promise.all([
-        aiClient
-          .extractMemory({
-            messages: apiMessages.slice(-10),
-            existingMemory: userConfig.aiMemory,
-            appContext: {
-              today,
-              yesterday,
-              activeGoals: activeGoals.slice(0, 12).map((goal) => ({
-                id: goal.id,
-                name: goal.name,
-                description: goal.description,
-                category: goal.category,
-                reminderTime: goal.reminderTime,
-                timeline: goalTimelineLabel(goal),
-                timelineSummary: goal.timelineSummary,
-                timelineMap: goal.timelineMap,
-              })),
-              completedToday,
-              missedYesterday,
-              recentCompletions,
-              recentJournals,
-              currentScore,
-              behaviorProfile: userConfig.behaviorProfile,
-              goalProgress,
-            },
-          })
-          .catch(() => ({ memory: undefined })),
-        aiClient
-          .extractIdentity({
-            messages: apiMessages.slice(-16),
-            existingIdentity: userConfig.userIdentity,
-          })
-          .catch(() => ({ identity: undefined })),
-      ]).then(([memRes, idRes]) => {
-        const next = { ...configWithHistory };
-        if (memRes?.memory && Object.keys(memRes.memory).length > 0) {
-          next.aiMemory = mergeMemory(userConfig.aiMemory, memRes.memory);
-        }
-        if (idRes?.identity) {
-          next.userIdentity = mergeIdentity(userConfig.userIdentity, idRes.identity);
-        }
-        if (next.aiMemory !== configWithHistory.aiMemory || next.userIdentity !== configWithHistory.userIdentity) {
-          onUpdateUserConfig(next);
-        }
-      });
+      // Throttled background memory/identity extraction to avoid burning rate limits on every single turn
+      const shouldExtract = newMessages.length % 3 === 0 || text.trim().length > 30;
+      if (shouldExtract) {
+        setTimeout(() => {
+          Promise.all([
+            aiClient
+              .extractMemory({
+                messages: apiMessages.slice(-10),
+                existingMemory: userConfig.aiMemory,
+                appContext: {
+                  today,
+                  yesterday,
+                  activeGoals: activeGoals.slice(0, 12).map((goal) => ({
+                    id: goal.id,
+                    name: goal.name,
+                    description: goal.description,
+                    category: goal.category,
+                    reminderTime: goal.reminderTime,
+                    timeline: goalTimelineLabel(goal),
+                    timelineSummary: goal.timelineSummary,
+                    timelineMap: goal.timelineMap,
+                  })),
+                  completedToday,
+                  missedYesterday,
+                  recentCompletions,
+                  recentJournals,
+                  currentScore,
+                  behaviorProfile: userConfig.behaviorProfile,
+                  goalProgress,
+                },
+              })
+              .catch(() => ({ memory: undefined })),
+            aiClient
+              .extractIdentity({
+                messages: apiMessages.slice(-16),
+                existingIdentity: userConfig.userIdentity,
+              })
+              .catch(() => ({ identity: undefined })),
+          ]).then(([memRes, idRes]) => {
+            const next = { ...configWithHistory };
+            if (memRes?.memory && Object.keys(memRes.memory).length > 0) {
+              next.aiMemory = mergeMemory(userConfig.aiMemory, memRes.memory);
+            }
+            if (idRes?.identity) {
+              next.userIdentity = mergeIdentity(userConfig.userIdentity, idRes.identity);
+            }
+            if (next.aiMemory !== configWithHistory.aiMemory || next.userIdentity !== configWithHistory.userIdentity) {
+              onUpdateUserConfig(next);
+            }
+          });
+        }, 1200);
+      }
 
     } catch (err: any) {
       console.error('NEXUS chat error:', err);
-      setBrainOffline(true);
       const errText = err?.detail || err?.message || String(err);
       setLastAiError(errText);
       const isNetwork =
         err?.code === 'NETWORK_OFFLINE' ||
         err?.message === 'NETWORK_OFFLINE' ||
         /Cannot reach local AI server/i.test(errText);
+      if (isNetwork) {
+        setBrainOffline(true);
+      }
       const reply = isNetwork
         ? `${apiOfflineMessage(Capacitor.isNativePlatform())}\n\n(meanwhile) ${smartOfflineReply(text, 'open_chat', userConfig.userName)}`
         : smartOfflineReply(text, 'open_chat', userConfig.userName);

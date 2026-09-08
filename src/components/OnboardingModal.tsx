@@ -228,10 +228,12 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
         .catch(() => {});
     } catch (err: any) {
       console.error('Onboarding chat error:', err);
-      setBrainOffline(true);
       const errText = err?.detail || err?.message || String(err);
       setLastAiError(errText);
       const isNetwork = err?.code === 'NETWORK_OFFLINE' || /Cannot reach/i.test(errText);
+      if (isNetwork) {
+        setBrainOffline(true);
+      }
       const reply = isNetwork
         ? `${apiOfflineMessage(Capacitor.isNativePlatform())}\n\n(meanwhile) ${smartOfflineReply(text, 'onboarding', userNameInput || undefined)}`
         : smartOfflineReply(text, 'onboarding', userNameInput || undefined);

@@ -221,12 +221,11 @@ export const aiClient = {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    if (!result?.reply || typeof result.reply !== 'string') {
-      throw new AiClientError('AI returned an empty reply', 'EMPTY_REPLY');
-    }
+    const reply = (result?.reply && typeof result.reply === 'string' ? result.reply : '').trim() || 'hey i hear u -- tell me more';
     return {
       ...result,
-      messages: Array.isArray(result.messages) ? result.messages : [result.reply],
+      reply,
+      messages: Array.isArray(result?.messages) && result.messages.length ? result.messages : [reply],
     };
   },
 
@@ -281,26 +280,29 @@ export const aiClient = {
       for (const part of parts) {
         const line = part.split('\n').find((l) => l.startsWith('data:'));
         if (!line) continue;
+        let payload: any;
         try {
-          handleEvent(JSON.parse(line.slice(5).trim()));
+          payload = JSON.parse(line.slice(5).trim());
         } catch {
-          /* ignore */
+          continue;
         }
+        handleEvent(payload);
       }
     }
     if (buffer.trim()) {
       const line = buffer.split('\n').find((l) => l.startsWith('data:'));
       if (line) {
+        let payload: any;
         try {
-          handleEvent(JSON.parse(line.slice(5).trim()));
+          payload = JSON.parse(line.slice(5).trim());
         } catch {
-          /* ignore */
+          /* ignore partial chunk */
         }
+        if (payload) handleEvent(payload);
       }
     }
 
-    const reply = doneMeta?.reply || full;
-    if (!reply) throw new AiClientError('AI returned an empty reply', 'EMPTY_REPLY');
+    const reply = (doneMeta?.reply || full || '').trim() || 'hey i hear u -- tell me more';
     return {
       reply,
       messages: Array.isArray(doneMeta?.messages) && doneMeta.messages.length ? doneMeta.messages : [reply],

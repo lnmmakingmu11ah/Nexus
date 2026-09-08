@@ -388,6 +388,39 @@ async function llmChat(options: {
           }
         }
       }
+
+      // If still failing and OpenRouter is available, fallback to OpenRouter
+      if (process.env.OPENROUTER_API_KEY && !isKilo && options.backend !== 'openrouter') {
+        console.warn(`Backend ${options.backend} failed (${res.status}), falling back to OpenRouter...`);
+        try {
+          const orBody: Record<string, any> = {
+            model: openRouterModel(),
+            messages: options.messages,
+            temperature: options.temperature ?? 0.7,
+            ...(options.json ? { response_format: { type: 'json_object' } } : {}),
+          };
+          const orRes = await fetch(OPENROUTER_API_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+              'HTTP-Referer': 'https://personal-growth-tracker.local',
+              'X-Title': 'Personal Growth Tracker',
+            },
+            body: JSON.stringify(orBody),
+          });
+          if (orRes.ok) {
+            const orJson = await orRes.json();
+            const orContent = orJson.choices?.[0]?.message?.content;
+            if (orContent) {
+              return Array.isArray(orContent) ? orContent.map((c: any) => c.text || '').join('') : String(orContent);
+            }
+          }
+        } catch (orErr) {
+          console.warn('OpenRouter fallback failed:', orErr);
+        }
+      }
+
       throw new Error(`LLM Error ${res.status}: ${errText}`);
     }
 
@@ -445,7 +478,43 @@ async function* llmChatStream(options: {
   }
   if (isKilo) headers['x-kilocode-mode'] = 'plan';
 
-  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  let res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+
+  // If primary Groq model fails (e.g. rate limit 429), try secondary model
+  if (!res.ok && isGroq && model !== 'qwen/qwen3.6-27b') {
+    console.warn(`Groq stream model ${model} failed (${res.status}), retrying with qwen/qwen3.6-27b...`);
+    body.model = 'qwen/qwen3.6-27b';
+    const retryRes = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    if (retryRes.ok && retryRes.body) {
+      res = retryRes;
+    }
+  }
+
+  // If still failing and OpenRouter key is available, fallback to OpenRouter
+  if (!res.ok && process.env.OPENROUTER_API_KEY && !isKilo && options.backend !== 'openrouter') {
+    console.warn(`Stream on ${options.backend} failed (${res.status}), falling back to OpenRouter...`);
+    try {
+      const orHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'HTTP-Referer': 'https://personal-growth-tracker.local',
+        'X-Title': 'Personal Growth Tracker',
+      };
+      const orBody: Record<string, any> = {
+        model: openRouterModel(),
+        messages: options.messages,
+        temperature: options.temperature ?? 0.7,
+        stream: true,
+      };
+      const orRes = await fetch(OPENROUTER_API_URL, { method: 'POST', headers: orHeaders, body: JSON.stringify(orBody) });
+      if (orRes.ok && orRes.body) {
+        res = orRes;
+      }
+    } catch (orErr) {
+      console.warn('OpenRouter stream fallback failed:', orErr);
+    }
+  }
+
   if (!res.ok || !res.body) {
     const errText = await res.text();
     throw new Error(`LLM stream error ${res.status}: ${errText}`);
@@ -1170,7 +1239,7 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
     if (!this.hasKey()) return new FallbackAIAdapter().chatCompanion(params);
 
     const rawMsgs = params.messages || [];
-    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs : [])
+    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs.slice(-16) : [])
       .filter((m) => (m.text || (m as any).content || '').trim())
       .map((m) => ({
         role: ((m.sender === 'user' || (m as any).role === 'user') ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -1178,11 +1247,17 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       }));
 
     const isOnboarding = params.userContext?.stage === 'onboarding';
-    const raw = await llmChat({
-      backend: this.backend,
-      temperature: isOnboarding ? 0.65 : 0.9,
-      messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
-    });
+    let raw = '';
+    try {
+      raw = await llmChat({
+        backend: this.backend,
+        temperature: isOnboarding ? 0.65 : 0.9,
+        messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
+      });
+    } catch (err: any) {
+      console.warn(`chatCompanion failed on backend ${this.backend}:`, err?.message || err);
+      return new FallbackAIAdapter().chatCompanion(params);
+    }
 
     const responseCoverage = isOnboarding ? analyzeIntakeCoverage(params.messages || [], params.userContext?.userIdentity) : undefined;
     const readyForPlan = /<<READY_FOR_PLAN>>/i.test(raw) && (!isOnboarding || Boolean(responseCoverage?.diagnosticComplete));
@@ -1200,10 +1275,11 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
 
     const messages = sanitizeAiBubbles(rawBubbles.map((b) => humanizeText(b, isOnboarding)));
     const fallback = 'hey i hear u -- tell me more';
+    const finalReply = (messages[0] || fallback).trim() || fallback;
 
     return {
-      reply: messages[0] || fallback,
-      messages: messages.length ? messages : [fallback],
+      reply: finalReply,
+      messages: messages.length ? messages : [finalReply],
       readyForPlan,
       planApproved,
     };
@@ -1226,7 +1302,7 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
     }
 
     const rawMsgs = params.messages || [];
-    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs : [])
+    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs.slice(-16) : [])
       .filter((m) => (m.text || (m as any).content || '').trim())
       .map((m) => ({
         role: ((m.sender === 'user' || (m as any).role === 'user') ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -1235,13 +1311,28 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
 
     const isOnboarding = params.userContext?.stage === 'onboarding';
     let raw = '';
-    for await (const chunk of llmChatStream({
-      backend: this.backend,
-      temperature: isOnboarding ? 0.65 : 0.9,
-      messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
-    })) {
-      raw += chunk;
-      onDelta(chunk);
+    try {
+      for await (const chunk of llmChatStream({
+        backend: this.backend,
+        temperature: isOnboarding ? 0.65 : 0.9,
+        messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
+      })) {
+        raw += chunk;
+        onDelta(chunk);
+      }
+    } catch (streamErr: any) {
+      console.warn(`Streaming failed on backend ${this.backend}:`, streamErr?.message || streamErr);
+      if (!raw.trim()) {
+        const fallback = await new FallbackAIAdapter().chatCompanion(params);
+        const fallbackText = (fallback as any).messages?.[0] || fallback.reply || 'hey i hear u -- tell me more';
+        onDelta(fallbackText);
+        return {
+          reply: fallbackText,
+          messages: [fallbackText],
+          readyForPlan: fallback.readyForPlan,
+          planApproved: fallback.planApproved,
+        };
+      }
     }
 
     const responseCoverage = isOnboarding ? analyzeIntakeCoverage(params.messages || [], params.userContext?.userIdentity) : undefined;
@@ -1258,9 +1349,10 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       .filter(Boolean);
     const messages = sanitizeAiBubbles(rawBubbles.map((b) => b.trim()));
     const fallback = 'hey i hear u -- tell me more';
+    const finalReply = (messages[0] || fallback).trim() || fallback;
     return {
-      reply: messages[0] || fallback,
-      messages: messages.length ? messages : [fallback],
+      reply: finalReply,
+      messages: messages.length ? messages : [finalReply],
       readyForPlan,
       planApproved,
     };
