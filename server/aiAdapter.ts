@@ -478,7 +478,19 @@ async function* llmChatStream(options: {
   }
   if (isKilo) headers['x-kilocode-mode'] = 'plan';
 
-  let res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  // 90s timeout — free Nemotron 550B can be slow under load; we want to wait long enough
+  // rather than silently drop to fallback after just a few seconds
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 90_000);
+
+  let res: Response;
+  try {
+    res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err?.name === 'AbortError') throw new Error(`LLM stream timeout (90s) on backend: ${options.backend}`);
+    throw err;
+  }
 
   // If primary Groq model fails (e.g. rate limit 429), try secondary model
   if (!res.ok && isGroq && model !== 'qwen/qwen3.6-27b') {
@@ -516,6 +528,7 @@ async function* llmChatStream(options: {
   }
 
   if (!res.ok || !res.body) {
+    clearTimeout(timeoutId);
     const errText = await res.text();
     throw new Error(`LLM stream error ${res.status}: ${errText}`);
   }
@@ -523,30 +536,34 @@ async function* llmChatStream(options: {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('data:')) continue;
-      const data = trimmed.slice(5).trim();
-      if (!data || data === '[DONE]') continue;
-      try {
-        const json = JSON.parse(data);
-        const delta = json.choices?.[0]?.delta?.content;
-        if (typeof delta === 'string' && delta) yield delta;
-        else if (Array.isArray(delta)) {
-          for (const part of delta) {
-            if (typeof part?.text === 'string' && part.text) yield part.text;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const data = trimmed.slice(5).trim();
+        if (!data || data === '[DONE]') continue;
+        try {
+          const json = JSON.parse(data);
+          const delta = json.choices?.[0]?.delta?.content;
+          if (typeof delta === 'string' && delta) yield delta;
+          else if (Array.isArray(delta)) {
+            for (const part of delta) {
+              if (typeof part?.text === 'string' && part.text) yield part.text;
+            }
           }
+        } catch {
+          /* ignore partial JSON */
         }
-      } catch {
-        /* ignore partial JSON */
       }
     }
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -2038,9 +2055,15 @@ export class FallbackAIAdapter implements AIProvider {
     const t = lastUserMsg.toLowerCase().trim();
 
     if (/^(hi|hello|hey|yo|sup)\b/.test(t)) {
-      return { reply: `hey${name ? ' ' + name : ''}! ðŸ‘‹ what's on ur mind today?` };
+      return { reply: `hey${name ? ' ' + name : ''}! \u{1F44B} what's on ur mind today?` };
     }
-    return { reply: `gotchu! tell me more about that ðŸ˜Š` };
+    if (/busy|tired|stressed|overwhelmed/.test(t)) {
+      return { reply: `that's real \u{1F4AA} one step at a time -- what's the one thing you can still get done today?` };
+    }
+    if (/gym|workout|exercise|train/.test(t)) {
+      return { reply: `let's get it \u{1F4AA}\u{1F525} even 20 minutes counts. what's the plan for today?` };
+    }
+    return { reply: `gotchu! tell me more about that \u{1F60A}` };
   }
 
   async synthesizeBlueprint(params: AISynthesizeBlueprintParams) {
