@@ -444,10 +444,13 @@ async function* llmChatStream(options: {
   messages: LlmMessage[];
   model?: string;
   temperature?: number;
+  maxTokens?: number;
+  timeoutMs?: number;
 }): AsyncGenerator<string> {
   const isGroq = options.backend === 'groq';
   const isKilo = options.backend === 'kilo';
   const isNvidia = options.backend === 'nvidia';
+  const isOR = options.backend === 'openrouter';
   const apiKey = isGroq
     ? process.env.GROQ_API_KEY
     : isKilo
@@ -465,7 +468,7 @@ async function* llmChatStream(options: {
     temperature: options.temperature ?? 0.7,
     stream: true,
   };
-  const maxTokens = Number(process.env.LLM_MAX_TOKENS || (isNvidia ? process.env.NVIDIA_MAX_TOKENS || 4096 : 0));
+  const maxTokens = options.maxTokens ?? Number(process.env.LLM_MAX_TOKENS || (isNvidia ? process.env.NVIDIA_MAX_TOKENS || 4096 : (isOR ? 500 : 0)));
   if (Number.isFinite(maxTokens) && maxTokens > 0) body.max_tokens = maxTokens;
 
   const headers: Record<string, string> = {
@@ -478,17 +481,17 @@ async function* llmChatStream(options: {
   }
   if (isKilo) headers['x-kilocode-mode'] = 'plan';
 
-  // 90s timeout — free Nemotron 550B can be slow under load; we want to wait long enough
-  // rather than silently drop to fallback after just a few seconds
+  // Swift 8s timeout rule for OpenRouter chat streams to prevent queue stalls; 25s for Groq/other
+  const timeoutLimit = options.timeoutMs ?? (isOR ? 8_000 : 25_000);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 90_000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutLimit);
 
   let res: Response;
   try {
     res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
   } catch (err: any) {
     clearTimeout(timeoutId);
-    if (err?.name === 'AbortError') throw new Error(`LLM stream timeout (90s) on backend: ${options.backend}`);
+    if (err?.name === 'AbortError') throw new Error(`LLM stream timeout (${Math.round(timeoutLimit / 1000)}s) on backend: ${options.backend}`);
     throw err;
   }
 
@@ -1256,7 +1259,7 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
     if (!this.hasKey()) return new FallbackAIAdapter().chatCompanion(params);
 
     const rawMsgs = params.messages || [];
-    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs.slice(-16) : [])
+    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs.slice(-12) : [])
       .filter((m) => (m.text || (m as any).content || '').trim())
       .map((m) => ({
         role: ((m.sender === 'user' || (m as any).role === 'user') ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -1273,7 +1276,21 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       });
     } catch (err: any) {
       console.warn(`chatCompanion failed on backend ${this.backend}:`, err?.message || err);
-      return new FallbackAIAdapter().chatCompanion(params);
+      // Failover to Groq if primary was OpenRouter or another provider
+      if (process.env.GROQ_API_KEY && this.backend !== 'groq') {
+        try {
+          console.log('chatCompanion failing over to Groq 120B...');
+          raw = await llmChat({
+            backend: 'groq',
+            temperature: isOnboarding ? 0.65 : 0.9,
+            messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
+          });
+        } catch {
+          return new FallbackAIAdapter().chatCompanion(params);
+        }
+      } else {
+        return new FallbackAIAdapter().chatCompanion(params);
+      }
     }
 
     const responseCoverage = isOnboarding ? analyzeIntakeCoverage(params.messages || [], params.userContext?.userIdentity) : undefined;
@@ -1319,7 +1336,7 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
     }
 
     const rawMsgs = params.messages || [];
-    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs.slice(-16) : [])
+    const history: LlmMessage[] = (Array.isArray(rawMsgs) ? rawMsgs.slice(-12) : [])
       .filter((m) => (m.text || (m as any).content || '').trim())
       .map((m) => ({
         role: ((m.sender === 'user' || (m as any).role === 'user') ? 'user' : 'assistant') as 'user' | 'assistant',
@@ -1333,6 +1350,8 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
         backend: this.backend,
         temperature: isOnboarding ? 0.65 : 0.9,
         messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
+        maxTokens: 500,
+        timeoutMs: this.backend === 'openrouter' ? 8000 : 25000,
       })) {
         raw += chunk;
         onDelta(chunk);
@@ -1340,15 +1359,36 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
     } catch (streamErr: any) {
       console.warn(`Streaming failed on backend ${this.backend}:`, streamErr?.message || streamErr);
       if (!raw.trim()) {
-        const fallback = await new FallbackAIAdapter().chatCompanion(params);
-        const fallbackText = (fallback as any).messages?.[0] || fallback.reply || 'hey i hear u -- tell me more';
-        onDelta(fallbackText);
-        return {
-          reply: fallbackText,
-          messages: [fallbackText],
-          readyForPlan: fallback.readyForPlan,
-          planApproved: fallback.planApproved,
-        };
+        // Swift failover to Groq 120B if primary was OpenRouter or stalled (>8s)
+        if (process.env.GROQ_API_KEY && this.backend !== 'groq') {
+          console.log('Stream stalled or failed, swiftly failing over to Groq 120B...');
+          try {
+            for await (const chunk of llmChatStream({
+              backend: 'groq',
+              temperature: isOnboarding ? 0.65 : 0.9,
+              messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
+              maxTokens: 500,
+              timeoutMs: 15000,
+            })) {
+              raw += chunk;
+              onDelta(chunk);
+            }
+          } catch (groqErr) {
+            console.warn('Groq failover also failed:', groqErr);
+          }
+        }
+
+        if (!raw.trim()) {
+          const fallback = await new FallbackAIAdapter().chatCompanion(params);
+          const fallbackText = (fallback as any).messages?.[0] || fallback.reply || 'hey i hear u -- tell me more';
+          onDelta(fallbackText);
+          return {
+            reply: fallbackText,
+            messages: [fallbackText],
+            readyForPlan: fallback.readyForPlan,
+            planApproved: fallback.planApproved,
+          };
+        }
       }
     }
 
@@ -1981,6 +2021,96 @@ export class OpenRouterAIAdapter extends LlmAIAdapter {
   }
 }
 
+export class SmartSplitAIAdapter implements AIProvider {
+  name = 'NEXUS Smart-Split Engine (Groq 120B Chat + Nemotron 550B Blueprints)';
+  private chatAdapter: GroqAIAdapter;
+  private planAdapter: OpenRouterAIAdapter;
+
+  constructor() {
+    this.chatAdapter = new GroqAIAdapter();
+    this.planAdapter = new OpenRouterAIAdapter();
+  }
+
+  async onboardingReflect(params: OnboardingParams) {
+    return this.chatAdapter.onboardingReflect(params);
+  }
+  async journalReflect(params: JournalParams) {
+    return this.chatAdapter.journalReflect(params);
+  }
+  async verifyProof(params: ProofParams) {
+    return this.chatAdapter.verifyProof(params);
+  }
+  async generateInsights(params: InsightsParams) {
+    return this.chatAdapter.generateInsights(params);
+  }
+  async chatCompanion(params: AIChatParams & { webContext?: string; nexusPersona?: any }) {
+    return this.chatAdapter.chatCompanion(params);
+  }
+  async streamChatCompanion(
+    params: AIChatParams & { webContext?: string; nexusPersona?: any },
+    onDelta: (chunk: string) => void
+  ) {
+    return this.chatAdapter.streamChatCompanion(params, onDelta);
+  }
+  async extractIdentity(params: any) {
+    return this.chatAdapter.extractIdentity(params);
+  }
+  async extractMemory(params: any) {
+    return this.chatAdapter.extractMemory(params);
+  }
+  async generateNudge(params: any) {
+    return this.chatAdapter.generateNudge(params);
+  }
+  async intakeTurn(params: any) {
+    return this.chatAdapter.intakeTurn(params);
+  }
+  async runFeasibilityCheck(params: any) {
+    try {
+      return await this.planAdapter.runFeasibilityCheck(params);
+    } catch {
+      return this.chatAdapter.runFeasibilityCheck(params);
+    }
+  }
+  async runWillpowerAssessment(params: any) {
+    try {
+      return await this.planAdapter.runWillpowerAssessment(params);
+    } catch {
+      return this.chatAdapter.runWillpowerAssessment(params);
+    }
+  }
+  async synthesizePlan(params: any) {
+    try {
+      console.log('Synthesizing progressive plan with Nemotron 550B on OpenRouter...');
+      return await this.planAdapter.synthesizePlan(params);
+    } catch (err: any) {
+      console.warn('Nemotron plan failed, failing over to Groq 120B:', err?.message || err);
+      return this.chatAdapter.synthesizePlan(params);
+    }
+  }
+  async chainGoals(params: any) {
+    try {
+      return await this.planAdapter.chainGoals(params);
+    } catch {
+      return this.chatAdapter.chainGoals(params);
+    }
+  }
+  async frameTasks(params: any) {
+    return this.chatAdapter.frameTasks(params);
+  }
+  async lapseRecovery(params: any) {
+    return this.chatAdapter.lapseRecovery(params);
+  }
+  async synthesizeBlueprint(params: AISynthesizeBlueprintParams) {
+    try {
+      console.log('Synthesizing lifetime blueprint with Nemotron 550B on OpenRouter...');
+      return await this.planAdapter.synthesizeBlueprint(params);
+    } catch (err: any) {
+      console.warn('Nemotron 550B blueprint failed, failing over to Groq 120B:', err?.message || err);
+      return this.chatAdapter.synthesizeBlueprint(params);
+    }
+  }
+}
+
 export class KiloAIAdapter extends LlmAIAdapter {
   constructor() {
     super('kilo');
@@ -2214,8 +2344,12 @@ export class FallbackAIAdapter implements AIProvider {
 }
 
 export function getAIAdapter(): AIProvider {
-  const provider = (process.env.AI_PROVIDER || 'groq').toLowerCase();
+  const provider = (process.env.AI_PROVIDER || 'smart_split').toLowerCase();
   switch (provider) {
+    case 'smart_split':
+    case 'smart':
+    case 'hybrid':
+      return new SmartSplitAIAdapter();
     case 'groq':
       return new GroqAIAdapter();
     case 'openrouter':
@@ -2230,6 +2364,6 @@ export function getAIAdapter(): AIProvider {
     case 'offline':
       return new FallbackAIAdapter();
     default:
-      return new GroqAIAdapter();
+      return new SmartSplitAIAdapter();
   }
 }
