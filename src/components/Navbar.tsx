@@ -36,21 +36,29 @@ export const Navbar: React.FC<NavbarProps> = ({
   const lastScrollY = useRef(0);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      const delta = currentScrollY - lastScrollY.current;
+    let ticking = false;
 
-      if (currentScrollY <= 8) {
-        // At the very top of page: always show top bar
-        setIsHeaderHidden(false);
-      } else if (delta < -3) {
-        // Scrolling UPWARDS: pop up the top bar
-        setIsHeaderHidden(false);
-      } else if (delta > 3 && currentScrollY > 20) {
-        // Scrolling DOWNWARDS: tuck away the top bar
-        setIsHeaderHidden(true);
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+          const delta = currentScrollY - lastScrollY.current;
+
+          if (currentScrollY <= 8) {
+            // At the very top of page: always show top bar
+            setIsHeaderHidden(false);
+          } else if (delta < -3) {
+            // Scrolling UPWARDS: pop up the top bar
+            setIsHeaderHidden(false);
+          } else if (delta > 3 && currentScrollY > 20) {
+            // Scrolling DOWNWARDS: tuck away the top bar
+            setIsHeaderHidden(true);
+          }
+          lastScrollY.current = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
       }
-      lastScrollY.current = currentScrollY;
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });

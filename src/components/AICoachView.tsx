@@ -29,7 +29,7 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { UserConfig, AIChatMessage, Goal, DailyGoalLog, DailyJournal, CATEGORY_NAMES, CATEGORY_COLORS, LifetimeMegaGoal, CategoryKey, Milestone, PlannedTask } from '../types';
+import { UserConfig, AIChatMessage, Goal, DailyGoalLog, DailyJournal, CATEGORY_NAMES, CATEGORY_COLORS, LifetimeMegaGoal, CategoryKey, CategoryScores, Milestone, PlannedTask } from '../types';
 import { aiClient } from '../services/aiClient';
 import { calculateWillpowerAnalytics } from '../utils/willpowerAnalytics';
 import { apiOfflineMessage, smartOfflineReply } from '../utils/chatFallback';
@@ -42,6 +42,7 @@ import { mergeIdentity } from '../utils/userIdentity';
 import { mapToPassiveCategory } from '../utils/blueprintNormalizer';
 import { GoalPathwayModal } from './GoalPathwayModal';
 import { getGoalPathway } from '../utils/goalPathways';
+import { getCriticalCategories } from '../utils/scoring';
 
 interface AICoachViewProps {
   userConfig: UserConfig;
@@ -60,6 +61,7 @@ interface AICoachViewProps {
   plannedTasks?: PlannedTask[];
   milestones?: Milestone[];
   initialTab?: 'blueprint' | 'chat';
+  categoryScores?: CategoryScores;
 }
 
 
@@ -235,6 +237,7 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
   plannedTasks = [],
   milestones = [],
   initialTab = 'chat',
+  categoryScores,
 }) => {
   const [activeTab, setActiveTab] = useState<'blueprint' | 'chat'>(initialTab);
 
@@ -411,6 +414,25 @@ export const AICoachView: React.FC<AICoachViewProps> = ({
               recentCompletions,
               recentJournals,
               currentScore,
+              categoryScores,
+              criticalCategories: categoryScores
+                ? getCriticalCategories(categoryScores).map((c) => ({
+                    category: c.category,
+                    name: c.name,
+                    score: c.score,
+                    actionRecommendation: c.actionRecommendation,
+                  }))
+                : undefined,
+              daysSinceLastJournal: journals.length > 0
+                ? Math.max(
+                    0,
+                    Math.floor(
+                      (new Date(`${today}T00:00:00`).getTime() -
+                        new Date(`${journals.slice().sort((a, b) => b.date.localeCompare(a.date))[0].date}T00:00:00`).getTime()) /
+                        (1000 * 60 * 60 * 24)
+                    )
+                  )
+                : 999,
               behaviorProfile: userConfig.behaviorProfile,
               goalProgress,
             },

@@ -58,7 +58,7 @@ import {
   PlannedTask,
   Milestone,
 } from '../types';
-import { ScoreCalculationResult, calculateGoalBestStreak } from '../utils/scoring';
+import { ScoreCalculationResult, calculateGoalBestStreak, getCriticalCategories } from '../utils/scoring';
 import { MonthlyCalendar } from './MonthlyCalendar';
 import { evaluateBadges } from '../utils/badges';
 import { calculateNexusPoints } from '../utils/gamification';
@@ -275,10 +275,88 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const missionPercent = activeGoals.length > 0 ? Math.round((completedTodayCount / activeGoals.length) * 100) : 0;
   const nexusPoints = calculateNexusPoints(goals, dailyLogs, todayStr, userConfig);
+  const criticalCategories = useMemo(
+    () => getCriticalCategories(scoreData.scores),
+    [scoreData.scores]
+  );
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-all duration-300 hover:border-white/15">
+      {/* Critical Life Pillar Inactivity Alert Banner */}
+      {criticalCategories.length > 0 && (
+        <div className="glass-card rounded-3xl p-4 sm:p-5 border-rose-500/30 bg-gradient-to-br from-rose-950/25 via-zinc-900/50 to-zinc-950/80 shadow-[0_8px_32px_rgba(244,63,94,0.12)] space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-2xl bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse text-sm">
+                ⚠️
+              </span>
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                  <span>Critical Pillar Alert</span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    {criticalCategories.length} Falling (&lt;35)
+                  </span>
+                </h4>
+                <p className="text-[11px] text-zinc-400">
+                  Pillars decay 2 pts/day without activity. Take deliberate action to recover balance.
+                </p>
+              </div>
+            </div>
+            {onNavigateTab && (
+              <button
+                onClick={() => onNavigateTab('aicoach')}
+                className="px-3 py-1.5 rounded-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
+              >
+                <span>Ask NEXUS</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            {criticalCategories.map((crit) => (
+              <div
+                key={crit.category}
+                className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-white/15 transition-all flex flex-col justify-between gap-2"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                      <span>{crit.icon}</span>
+                      <span>{crit.name}</span>
+                    </span>
+                    <span className="text-[11px] font-mono font-bold text-rose-400 bg-rose-500/15 px-1.5 py-0.5 rounded border border-rose-500/30">
+                      {crit.score}/100
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 leading-relaxed">
+                    {crit.reason}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-white/[0.05] flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-amber-300/90 font-medium line-clamp-1">
+                    💡 {crit.actionRecommendation}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (crit.category === 'spiritual' || crit.category === 'happiness' || crit.category === 'selfCare') {
+                        onNavigateTab?.('journal');
+                      } else {
+                        onOpenAddGoal();
+                      }
+                    }}
+                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 whitespace-nowrap cursor-pointer hover:underline"
+                  >
+                    Act now &rarr;
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="glass-card-premium rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-all duration-300 hover:border-white/20">
         <div className="space-y-3 flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
@@ -313,7 +391,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={() => currentMissionGoal ? onToggleGoal(currentMissionGoal.id) : onOpenAddGoal()}
-              className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full font-semibold transition-all hover:bg-amber-500/20"
+              className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full font-semibold transition-all hover:bg-amber-500/20 cursor-pointer active:scale-95"
             >
               What should I do next?
             </button>
@@ -332,7 +410,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     onClick={() => setSelectedMissionGoalId(g.id)}
                     className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-white/[0.12] text-white border border-white/20 shadow-sm'
+                        ? 'bg-white/[0.15] text-white border border-white/25 shadow-sm'
                         : isDone
                           ? 'bg-zinc-900/40 text-zinc-500 border border-white/[0.04] line-through'
                           : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-white/[0.06]'
@@ -359,15 +437,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 min-w-full lg:min-w-[480px]">
-          <div className="glass-card-subtle rounded-2xl p-3.5 border border-white/[0.06]">
+          <div className="glass-inset rounded-2xl p-3.5 border border-white/[0.06]">
             <p className="text-[10px] text-zinc-500 uppercase font-mono">Progress</p>
             <p className="text-xl font-bold text-emerald-400 font-mono">{missionPercent}%</p>
           </div>
-          <div className="glass-card-subtle rounded-2xl p-3.5 border border-white/[0.06]">
+          <div className="glass-inset rounded-2xl p-3.5 border border-white/[0.06]">
             <p className="text-[10px] text-zinc-500 uppercase font-mono">Done</p>
             <p className="text-xl font-bold text-white font-mono">{completedTodayCount}/{activeGoals.length}</p>
           </div>
-          <div className="glass-card-subtle rounded-2xl p-3.5 border border-white/[0.06]">
+          <div className="glass-inset rounded-2xl p-3.5 border border-white/[0.06]">
             <div className="flex items-center justify-between">
               <p className="text-[10px] text-zinc-500 uppercase font-mono">NEXUS XP</p>
               {nexusPoints.todayStreakMultiplier > 1 && (
@@ -395,7 +473,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onOpenAddGoal();
               }
             }}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl p-3 flex items-center justify-center gap-1.5 text-xs font-semibold transition-colors cursor-pointer active:scale-95 shadow-md shadow-emerald-950/40"
+            className="cta-pill-orange rounded-2xl p-3 flex items-center justify-center gap-1.5 text-xs font-bold cursor-pointer active:scale-95 shadow-lg"
           >
             <span>{currentMissionGoal ? 'Mark Done' : 'Add Goal'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -464,7 +542,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Composite Life Score & Overview Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         {/* Radar Chart Section (7 cols) */}
-        <div className="lg:col-span-7 glass-card rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between space-y-4 transition-all duration-300 hover:border-white/15">
+        <div className="lg:col-span-7 glass-card-premium rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between space-y-4 transition-all duration-300 hover:border-white/20">
           <div className="flex items-start sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
             <div className="min-w-0 flex-1">
               <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center space-x-2">
@@ -539,7 +617,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               return (
                 <div
                   key={catKey}
-                  className={`glass-card-subtle p-3 rounded-2xl border border-white/[0.06] hover:border-white/15 flex flex-col items-center justify-between shadow-sm transition-all ${
+                  className={`glass-inset p-3 rounded-2xl border border-white/[0.06] hover:border-white/15 flex flex-col items-center justify-between shadow-sm transition-all ${
                     idx === 4 ? 'col-span-2 sm:col-span-1' : ''
                   }`}
                 >
@@ -565,7 +643,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Category Breakdown & Decay Alerts (5 cols) */}
-        <div className="lg:col-span-5 glass-card rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col justify-between space-y-4 transition-all duration-300 hover:border-white/15">
+        <div className="lg:col-span-5 glass-card-premium rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col justify-between space-y-4 transition-all duration-300 hover:border-white/20">
           <div>
             <div className="flex items-center justify-between pb-2 border-b border-white/[0.06] mb-3">
               <h3 className="text-base font-bold text-white">Category Status</h3>
@@ -583,7 +661,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 return (
                   <div
                     key={catKey}
-                    className="p-3.5 glass-card-subtle rounded-2xl border border-white/[0.06] hover:border-white/15 transition-all shadow-sm"
+                    className="p-3.5 glass-inset rounded-2xl border border-white/[0.06] hover:border-white/15 transition-all shadow-sm"
                   >
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center space-x-2">

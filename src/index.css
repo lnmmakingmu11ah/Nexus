@@ -53,37 +53,40 @@ body,
   height: calc(4rem + env(safe-area-inset-top, 0px));
 }
 
-/* ── Tab / page transitions ────────────────────────────────────────────── */
+/* ── Tab / page transitions: Smooth, deliberate, flawless ─────────────── */
 @keyframes nexus-slide-up {
-  from { opacity: 0.95; transform: translateY(6px); }
+  from { opacity: 0.7; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes nexus-fade-in {
-  from { opacity: 0.95; }
+  from { opacity: 0.6; }
   to   { opacity: 1; }
 }
 @keyframes nexus-slide-from-right {
-  from { opacity: 0.95; transform: translateX(12px); }
+  from { opacity: 0.7; transform: translateX(12px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 @keyframes nexus-slide-from-left {
-  from { opacity: 0.95; transform: translateX(-12px); }
+  from { opacity: 0.7; transform: translateX(-12px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
 .nexus-page-enter {
-  animation: nexus-slide-up 180ms ease-out;
+  animation: nexus-slide-up 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 .nexus-page-enter-right {
-  animation: nexus-slide-from-right 180ms ease-out;
+  animation: nexus-slide-from-right 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 .nexus-page-enter-left {
-  animation: nexus-slide-from-left 180ms ease-out;
+  animation: nexus-slide-from-left 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 
 /* Used on toasts / banners */
 .animate-fade-in {
-  animation: nexus-fade-in 240ms ease both;
+  animation: nexus-fade-in 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ── Bottom nav clearance ──────────────────────────────────────────────── */
@@ -101,6 +104,8 @@ body,
 /* ── Reduced-motion: no decorative animations ──────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .nexus-page-enter,
+  .nexus-page-enter-right,
+  .nexus-page-enter-left,
   .animate-fade-in {
     animation: none;
   }
@@ -109,35 +114,76 @@ body,
   }
 }
 
-/* ── Luxury Glassmorphic Design System (Reference: image 5 luxury aesthetic) ── */
+/* ── Luxury Glassmorphic Design System (Reference: Hume Smart Home luxury aesthetic) ── */
 .glass-card {
-  background: rgba(18, 21, 28, 0.55);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: rgba(18, 21, 28, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.07);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .glass-card-subtle {
-  background: rgba(22, 26, 35, 0.4);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(22, 26, 35, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
-.glass-pill {
-  background: rgba(25, 29, 39, 0.7);
+.glass-card-premium {
+  background: linear-gradient(160deg, rgba(26, 30, 40, 0.75) 0%, rgba(14, 16, 22, 0.85) 100%);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.glass-inset {
+  background: rgba(10, 12, 16, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.glass-pill {
+  background: rgba(25, 29, 39, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65), inset 0 1px 1px rgba(255, 255, 255, 0.09);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Glowing Warm Orange Pill CTA (Matching reference image Hume smart home) */
+.cta-pill-orange {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  box-shadow: 0 4px 20px rgba(234, 88, 12, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  font-weight: 600;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cta-pill-orange:hover {
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+  box-shadow: 0 6px 28px rgba(234, 88, 12, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .ambient-app-bg {
   background-color: #0b0c10;
   background-image: 
-    radial-gradient(at 10% 8%, rgba(245, 158, 11, 0.035) 0px, transparent 45%),
-    radial-gradient(at 90% 15%, rgba(99, 102, 241, 0.03) 0px, transparent 40%),
+    radial-gradient(at 10% 8%, rgba(245, 158, 11, 0.04) 0px, transparent 45%),
+    radial-gradient(at 90% 15%, rgba(99, 102, 241, 0.035) 0px, transparent 40%),
     radial-gradient(at 50% 60%, rgba(245, 158, 11, 0.02) 0px, transparent 50%),
     radial-gradient(at 20% 90%, rgba(16, 185, 129, 0.02) 0px, transparent 45%);
   background-attachment: fixed;

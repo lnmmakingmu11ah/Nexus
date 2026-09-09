@@ -104,6 +104,9 @@ export interface AIChatParams {
       recentCompletions: { date: string; goals: string[] }[];
       recentJournals: { date: string; entry: string; mood?: number }[];
       currentScore?: number;
+      categoryScores?: Record<string, number>;
+      criticalCategories?: { category: string; name: string; score: number; actionRecommendation: string }[];
+      daysSinceLastJournal?: number;
       behaviorProfile?: {
         currentDailyCap?: number;
         avgStreakBeforeDropoff?: number;
@@ -706,12 +709,25 @@ function formatAppContextBlock(appContext?: AIChatParams['userContext']['appCont
     `- ${goal.name}: streak ${goal.streak}, likelihood ${goal.likelihoodPercent}%, timeline ${goal.formattedTimeline}, status ${goal.statusLabel}`
   );
 
+  const scores = appContext.categoryScores;
+  const categoryScoresText = scores
+    ? `- Category Vitals: Health: ${scores.health ?? '?'}/100 | Spiritual: ${scores.spiritual ?? '?'}/100 | Smarts: ${scores.smarts ?? '?'}/100 | Self-Care: ${scores.selfCare ?? '?'}/100 | Happiness: ${scores.happiness ?? '?'}/100`
+    : '';
+  const criticalWarning = appContext.criticalCategories?.length
+    ? `⚠️ CRITICAL FALLING CATEGORIES (<35) REQUIRING ATTENTION:\n${appContext.criticalCategories
+        .map((c) => `- ${c.name} (${c.score}/100): ${c.actionRecommendation}`)
+        .join('\n')}`
+    : '';
+  const journalDays = typeof appContext.daysSinceLastJournal === 'number'
+    ? `- Days since last journal entry: ${appContext.daysSinceLastJournal}d`
+    : '';
+
   return `
 CURRENT APP CONTEXT:
 - Today: ${appContext.today}
 - Yesterday: ${appContext.yesterday}
 - Current score: ${typeof appContext.currentScore === 'number' ? `${appContext.currentScore}/100` : 'unknown'}
-- Completed today: ${appContext.completedToday?.length ? appContext.completedToday.join(', ') : 'nothing logged yet'}
+${categoryScoresText ? `${categoryScoresText}\n` : ''}${journalDays ? `${journalDays}\n` : ''}${criticalWarning ? `${criticalWarning}\n` : ''}- Completed today: ${appContext.completedToday?.length ? appContext.completedToday.join(', ') : 'nothing logged yet'}
 - Missed yesterday: ${appContext.missedYesterday?.length ? appContext.missedYesterday.join(', ') : 'none logged as missed'}
 ${behaviorProfile.length ? `Behavior profile:\n${behaviorProfile.join('\n')}\n` : ''}
 Active goals:
@@ -1110,6 +1126,17 @@ GOALS & COACHING (when it comes up naturally):
 - Missed stuff: curious, zero judgment. "what happened — be honest"
 - One small next step max. Don't preach. Don't recap their whole dashboard unless they asked.
 
+CATEGORY VITALS & PROACTIVE ADVICE (CRITICAL RULE):
+- The app monitors 5 pillars: Health, Spiritual Resonance, Cognitive Smarts, Self-Care, and Happiness.
+- Inactivity causes these to decay (~2 pts/day). If ANY category in APP CONTEXT is CRITICAL (<35) or falling:
+  * Proactively notice it and casually bring it up like a friend who cares!
+  * If Spiritual is low: suggest 5–10 mins of meditation, prayer, contemplation, or setting a spiritual habit.
+  * If Health is low: nudge them to drink water, stretch, or do a 15-min workout.
+  * If Smarts is low: suggest reading a chapter or doing a quick cognitive drill.
+  * If Self-Care is low: remind them to rest, unplug, or take a reset break.
+  * If Happiness is low: ask how they're feeling, invite them to vent, or celebrate a win.
+  * Offer to add the goal for them immediately using <<ACTION:ADD_GOAL:...>>!
+
 REAL APP ACTIONS (You can directly trigger app features when asked):
 If the user asks you to add a goal, mark a goal done/completed, open a screen/tab, or save a journal note, include the matching action token in your reply:
 - Add a goal: <<ACTION:ADD_GOAL:{"name":"Read 20 mins","category":"smarts","frequency":"daily","reminderTime":"08:30"}>>
@@ -1117,9 +1144,10 @@ If the user asks you to add a goal, mark a goal done/completed, open a screen/ta
 - Navigate to screen: <<ACTION:NAVIGATE:dashboard|goals|trends|journal|insights|achievements>>
 - Save journal entry: <<ACTION:ADD_JOURNAL:{"entry":"text","mood":4}>>
 
-Example: User says "add a goal to workout 30 mins" â†’ reply naturally and add: <<ACTION:ADD_GOAL:{"name":"Workout 30 mins","category":"health"}>>
-Example: User says "i finished reading today" â†’ reply naturally and add: <<ACTION:COMPLETE_GOAL:read>>
-Example: User says "show me my stats" â†’ reply naturally and add: <<ACTION:NAVIGATE:trends>>`;
+Example: User says "add a goal to workout 30 mins" → reply naturally and add: <<ACTION:ADD_GOAL:{"name":"Workout 30 mins","category":"health"}>>
+Example: User says "i finished reading today" → reply naturally and add: <<ACTION:COMPLETE_GOAL:read>>
+Example: User says "show me my stats" → reply naturally and add: <<ACTION:NAVIGATE:trends>>
+Example: User vents or shares a reflection → save it directly: <<ACTION:ADD_JOURNAL:{"entry":"User reflection text","mood":4}>>`;
 
   // â”€â”€â”€ Angry mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const angryPrompt = `You are NEXUS and you're currently giving the user the cold shoulder bc they were rude. Keep it short, a little distant â€” "mmk", "sure", "okay". Still human. Maybe warm up slightly if they apologize sincerely. ${bubbleInstruction}`;
@@ -1351,7 +1379,7 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       .filter(Boolean);
 
     const messages = sanitizeAiBubbles(rawBubbles.map((b) => humanizeText(b, isOnboarding)));
-    const fallback = 'hey i hear u -- tell me more';
+    const fallback = (await new FallbackAIAdapter().chatCompanion(params)).reply || 'i got u 👀 what else is on ur mind?';
     const finalReply = (messages[0] || fallback).trim() || fallback;
 
     return {
@@ -1465,7 +1493,7 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
 
     if (!raw.trim()) {
       const fallback = await new FallbackAIAdapter().chatCompanion(params);
-      const fallbackText = (fallback as any).messages?.[0] || fallback.reply || 'hey i hear u -- tell me more';
+      const fallbackText = (fallback as any).messages?.[0] || fallback.reply || 'i got u 👀 what else is on ur mind?';
       onDelta(fallbackText);
       return {
         reply: fallbackText,
@@ -1489,8 +1517,11 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       .map((b) => b.replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '').replace(/^\|+|\|+$/g, '').trim())
       .filter(Boolean);
     const messages = sanitizeAiBubbles(rawBubbles.map((b) => b.trim()));
-    const fallback = 'hey i hear u -- tell me more';
-    const finalReply = (messages[0] || fallback).trim() || fallback;
+    // If sanitization wiped everything (garbage response), use FallbackAIAdapter for a contextual reply
+    const fallbackMsg = messages.length === 0
+      ? ((await new FallbackAIAdapter().chatCompanion(params)).reply || 'i got u 👀 what else is on ur mind?')
+      : '';
+    const finalReply = (messages[0] || fallbackMsg).trim();
     return {
       reply: finalReply,
       messages: messages.length ? messages : [finalReply],

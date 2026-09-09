@@ -41,36 +41,44 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
   }, [currentTab]);
 
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      const windowHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-      const totalHeight = Math.max(
-        document.documentElement.scrollHeight,
-        document.body.scrollHeight
-      );
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+          const windowHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+          const totalHeight = Math.max(
+            document.documentElement.scrollHeight,
+            document.body.scrollHeight
+          );
 
-      const delta = currentScrollY - lastScrollY.current;
-      const isFullyAtTop = currentScrollY <= 8;
-      const isFullyAtBottom = (windowHeight + currentScrollY) >= (totalHeight - 20);
+          const delta = currentScrollY - lastScrollY.current;
+          const isFullyAtTop = currentScrollY <= 8;
+          const isFullyAtBottom = (windowHeight + currentScrollY) >= (totalHeight - 20);
 
-      if (isFullyAtTop) {
-        // At the very top: hide bottom bar so ONLY top bar pops up
-        setIsVisible(false);
-        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-      } else if (isFullyAtBottom) {
-        // Scrolled all the way to bottom: show bottom bar
-        setIsVisible(true);
-        resetInactivityTimer(3500);
-      } else if (delta < -3) {
-        // Scrolling UPWARDS towards top: hide bottom bar (ONLY top bar pops up)
-        setIsVisible(false);
-        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-      } else if (delta > 3) {
-        // Scrolling DOWNWARDS: pop up bottom bar
-        setIsVisible(true);
-        resetInactivityTimer(3500);
+          if (isFullyAtTop) {
+            // At the very top: hide bottom bar so ONLY top bar pops up
+            setIsVisible(false);
+            if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+          } else if (isFullyAtBottom) {
+            // Scrolled all the way to bottom: show bottom bar
+            setIsVisible(true);
+            resetInactivityTimer(3500);
+          } else if (delta < -3) {
+            // Scrolling UPWARDS towards top: hide bottom bar (ONLY top bar pops up)
+            setIsVisible(false);
+            if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+          } else if (delta > 3) {
+            // Scrolling DOWNWARDS: pop up bottom bar
+            setIsVisible(true);
+            resetInactivityTimer(3500);
+          }
+          lastScrollY.current = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
       }
-      lastScrollY.current = currentScrollY;
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });

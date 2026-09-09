@@ -156,6 +156,9 @@ export interface AIChatRequest {
       recentCompletions: { date: string; goals: string[] }[];
       recentJournals: { date: string; entry: string; mood?: number }[];
       currentScore?: number;
+      categoryScores?: Record<string, number>;
+      criticalCategories?: { category: string; name: string; score: number; actionRecommendation: string }[];
+      daysSinceLastJournal?: number;
       behaviorProfile?: {
         currentDailyCap?: number;
         avgStreakBeforeDropoff?: number;
@@ -221,7 +224,7 @@ export const aiClient = {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    const reply = (result?.reply && typeof result.reply === 'string' ? result.reply : '').trim() || 'hey i hear u -- tell me more';
+    const reply = (result?.reply && typeof result.reply === 'string' ? result.reply : '').trim() || 'i got u 👀 what else is on ur mind?';
     return {
       ...result,
       reply,
@@ -302,7 +305,7 @@ export const aiClient = {
       }
     }
 
-    const reply = (doneMeta?.reply || full || '').trim() || 'hey i hear u -- tell me more';
+    const reply = (doneMeta?.reply || full || '').trim() || 'i got u 👀 what else is on ur mind?';
     return {
       reply,
       messages: Array.isArray(doneMeta?.messages) && doneMeta.messages.length ? doneMeta.messages : [reply],
