@@ -323,6 +323,7 @@ async function llmChat(options: {
   model?: string;
   temperature?: number;
   json?: boolean;
+  timeoutMs?: number;
 }): Promise<string> {
   const isGroq = options.backend === 'groq';
   const isKilo = options.backend === 'kilo';
@@ -365,11 +366,16 @@ async function llmChat(options: {
     headers['x-kilocode-mode'] = 'plan';
   }
 
+  const timeoutLimit = options.timeoutMs ?? (options.backend === 'openrouter' ? 12_000 : 25_000);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutLimit);
+
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
 
     if (!res.ok) {
@@ -382,6 +388,7 @@ async function llmChat(options: {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
+          signal: controller.signal,
         });
         if (retryRes.ok) {
           const retryJson = await retryRes.json();
@@ -411,6 +418,7 @@ async function llmChat(options: {
               'X-Title': 'Personal Growth Tracker',
             },
             body: JSON.stringify(orBody),
+            signal: controller.signal,
           });
           if (orRes.ok) {
             const orJson = await orRes.json();
@@ -438,7 +446,12 @@ async function llmChat(options: {
     }
     return String(content);
   } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error(`LLM request timed out after ${Math.round(timeoutLimit / 1000)}s on backend: ${options.backend}`);
+    }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -1042,6 +1055,16 @@ LOCAL CONTEXT:
 
   const persona = (params as any).nexusPersona || {};
   const personaBlock = `\n${formatPersonaForPrompt(persona)}\n`;
+  const presenceModes = [
+    'quiet and observant; keep replies short and warm',
+    'playfully energized; a little more hype is fine',
+    'focused and practical; turn fuzzy feelings into one next move',
+    'reflective; notice progress before offering advice',
+    'lightly chaotic in a funny way; never at the user’s expense',
+  ];
+  const hour = new Date().getHours();
+  const presenceMode = presenceModes[(hour + (params.messages?.length || 0)) % presenceModes.length];
+  const presenceBlock = `\nCURRENT CONVERSATION VIBE: ${presenceMode}. This is only a changing in-app tone, not a claim that you have an off-screen private life. Vary message length, openings, emojis, and whether you double-text; never repeat a canned greeting.\n`;
   const identityBlock = formatIdentityForPrompt(params.userContext?.userIdentity);
 
   const isAngry = !!(persona.angryAt) && stage === 'open_chat';
@@ -1167,6 +1190,7 @@ ${appContextBlock}
 ${locationBlock}
 ${webContextBlock}
 ${personaBlock}
+${presenceBlock}
 User Name: ${params.userContext?.userName || params.userContext?.userIdentity?.name || 'friend'}
 CRITICAL OUTPUT CONSTRAINT: Output ONLY the direct chat message(s). NEVER output <think> tags, chain-of-thought, reasoning steps, or prompt constraint analysis. Begin immediately with the message. Follow the bubble target instruction above. No "NEXUS:" prefix.`;
 }
@@ -1968,6 +1992,7 @@ If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONL
       model: highStakesModelForBackend(this.backend),
       json: true,
       temperature: 0.3,
+      timeoutMs: 18_000,
       messages: [
         { role: 'system', content: 'Rigorous honest goal feasibility analyst. Return JSON only.' },
         { role: 'user', content: `Goal: "${goalTitle}"\nDescription: "${goalDesc}"\nTimeline: "${timeline}"\nWeekly hours: ${weeklyHours}\nPast attempts: ${JSON.stringify(pastAttempts)}\nReturn JSON: {"pass": boolean, "reason": "1-2 sentences", "proposedRevision": {"timelineRange": {"minDays": number, "maxDays": number}, "scopeNote": "..."}}` },
@@ -2018,6 +2043,7 @@ If emitting <<READY_FOR_FEASIBILITY>>, put it on the last line alone. Output ONL
       model: highStakesModelForBackend(this.backend),
       json: true,
       temperature: 0.45,
+      timeoutMs: 22_000,
       messages: [
         { role: 'system', content: `Generate ultra-actionable, domain-specific habit execution plans with sequential 7-day action items, weekly progression, and monthly milestones.
 CRITICAL INSTRUCTION:
@@ -2412,7 +2438,14 @@ export class FallbackAIAdapter implements AIProvider {
   }
 
   async runFeasibilityCheck(params: FeasibilityParams): Promise<FeasibilityResult> {
-    return { pass: true, reason: 'Offline mode â€” assuming feasible. Connect to verify.' };
+    return {
+      pass: false,
+      reason: 'NEXUS is offline, so it cannot responsibly verify this timeline yet.',
+      proposedRevision: {
+        timelineRange: { minDays: 30, maxDays: 180 },
+        scopeNote: 'Use this as a temporary planning range and re-check feasibility when AI is available.',
+      },
+    };
   }
 
   async runWillpowerAssessment(_params: any) {
