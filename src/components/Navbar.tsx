@@ -38,11 +38,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-      if (currentScrollY <= 5) {
-        // Only pops up when scrolled fully to the very top
+      const delta = currentScrollY - lastScrollY.current;
+
+      if (currentScrollY <= 8) {
+        // At the very top of page: always show top bar
         setIsHeaderHidden(false);
-      } else if (currentScrollY > 20) {
-        // Hidden anywhere else while scrolling through page
+      } else if (delta < -3) {
+        // Scrolling UPWARDS: pop up the top bar
+        setIsHeaderHidden(false);
+      } else if (delta > 3 && currentScrollY > 20) {
+        // Scrolling DOWNWARDS: tuck away the top bar
         setIsHeaderHidden(true);
       }
       lastScrollY.current = currentScrollY;
@@ -84,7 +89,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <header className={`app-topbar bg-zinc-950/95 backdrop-blur-2xl border-b border-zinc-800/80 text-zinc-100 shadow-xl shadow-black/60 will-change-transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isHeaderHidden ? '-translate-y-full' : 'translate-y-0'}`}>
+    <header className={`app-topbar bg-gradient-to-b from-zinc-950/95 via-zinc-950/80 to-transparent backdrop-blur-2xl border-none text-zinc-100 will-change-transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isHeaderHidden ? '-translate-y-full' : 'translate-y-0'}`}>
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 relative">
           {/* Left spacer for perfect geometric center balance */}

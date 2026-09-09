@@ -975,7 +975,7 @@ export default function App() {
   }, [userConfig]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500 selection:text-zinc-950 antialiased">
+    <div className="min-h-screen ambient-app-bg text-zinc-100 font-sans selection:bg-amber-500 selection:text-zinc-950 antialiased relative overflow-x-hidden">
       {/* Top Navbar — hidden in NEXUS chat so it's a true full-page talking interface */}
       {currentTab !== 'aicoach' && (
         <>

@@ -49,17 +49,26 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
         document.body.scrollHeight
       );
 
-      const isFullyAtTop = currentScrollY <= 5;
+      const delta = currentScrollY - lastScrollY.current;
+      const isFullyAtTop = currentScrollY <= 8;
       const isFullyAtBottom = (windowHeight + currentScrollY) >= (totalHeight - 20);
 
-      if (isFullyAtTop || isFullyAtBottom) {
-        // Only pops up when scrolled fully to the top or fully to the bottom
-        setIsVisible(true);
-        resetInactivityTimer(3500);
-      } else if (currentScrollY > 20) {
-        // Hidden anywhere in between while reading/scrolling
+      if (isFullyAtTop) {
+        // At the very top: hide bottom bar so ONLY top bar pops up
         setIsVisible(false);
         if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+      } else if (isFullyAtBottom) {
+        // Scrolled all the way to bottom: show bottom bar
+        setIsVisible(true);
+        resetInactivityTimer(3500);
+      } else if (delta < -3) {
+        // Scrolling UPWARDS towards top: hide bottom bar (ONLY top bar pops up)
+        setIsVisible(false);
+        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+      } else if (delta > 3) {
+        // Scrolling DOWNWARDS: pop up bottom bar
+        setIsVisible(true);
+        resetInactivityTimer(3500);
       }
       lastScrollY.current = currentScrollY;
     };
@@ -200,7 +209,7 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
         }`}
         style={{ bottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
       >
-        <nav className="bg-zinc-950/95 backdrop-blur-2xl border border-amber-500/30 rounded-2xl p-1 shadow-2xl shadow-black/90 flex items-center justify-between ring-1 ring-amber-500/20">
+        <nav className="bg-zinc-900/85 backdrop-blur-2xl border border-white/[0.09] rounded-full p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.75)] flex items-center justify-between ring-1 ring-white/[0.04]">
           {/* 4 Primary Navigation Tabs */}
           {primaryNavItems.map((item) => {
             const Icon = item.icon;
@@ -211,9 +220,9 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
                 key={item.id}
                 onClick={() => handleSelectTab(item.id)}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
-                className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-200 active:scale-95 relative min-h-[48px] select-none will-change-transform ${
+                className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-full transition-all duration-200 active:scale-95 relative min-h-[46px] select-none will-change-transform ${
                   isActive
-                    ? 'text-amber-300 bg-amber-500/15 border border-amber-500/35 font-semibold shadow-sm'
+                    ? 'text-white bg-white/[0.1] shadow-sm font-semibold'
                     : 'text-zinc-400 hover:text-zinc-200 font-normal'
                 }`}
               >
@@ -222,12 +231,12 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
                     isActive ? 'scale-110 text-amber-400' : 'text-zinc-400'
                   }`}
                 />
-                <span className="text-[10px] mt-1 font-medium tracking-tight truncate max-w-[58px]">
+                <span className="text-[10px] mt-0.5 font-medium tracking-tight truncate max-w-[58px]">
                   {item.label}
                 </span>
 
                 {isActive && (
-                  <span className="absolute -bottom-0.5 w-4 h-1 bg-amber-400 rounded-full shadow-sm shadow-amber-400/80" />
+                  <span className="absolute bottom-1 w-1 h-1 bg-amber-400 rounded-full shadow-sm shadow-amber-400" />
                 )}
               </button>
             );
@@ -243,9 +252,9 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
               <button
                 onClick={() => setShowMoreDrawer((prev) => !prev)}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
-                className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-200 active:scale-95 relative min-h-[48px] select-none will-change-transform ${
+                className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-full transition-all duration-200 active:scale-95 relative min-h-[46px] select-none will-change-transform ${
                   isActive
-                    ? 'text-amber-300 bg-amber-500/15 border border-amber-500/35 font-semibold shadow-sm'
+                    ? 'text-white bg-white/[0.1] shadow-sm font-semibold'
                     : 'text-zinc-400 hover:text-zinc-200 font-normal'
                 }`}
               >

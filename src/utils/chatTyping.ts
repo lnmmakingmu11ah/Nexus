@@ -96,7 +96,8 @@ export async function dripAiBubbles(
 
 export function stripChatControlTokens(text: string): string {
   return (text || '')
-    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
+    .replace(/^Here's a thinking process:[\s\S]*?(?=(?:hey|hi|hello|yo|what|gotchu|let's|i'm|i |my |bro|dude|\n\n|$))/i, '')
     .replace(/<<READY_FOR_PLAN>>/gi, '')
     .replace(/<<PLAN_APPROVED>>/gi, '')
     .replace(/^\s*(NEXUS\s*:|AI\s*:|Assistant\s*:)/i, '')

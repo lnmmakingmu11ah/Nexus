@@ -372,9 +372,9 @@ async function llmChat(options: {
     if (!res.ok) {
       const errText = await res.text();
       // If Groq primary model fails, fallback to secondary model
-      if (isGroq && model !== 'qwen/qwen3.6-27b') {
-        console.warn(`Groq model ${model} failed (${res.status}), retrying with qwen/qwen3.6-27b...`);
-        body.model = 'qwen/qwen3.6-27b';
+      if (isGroq && model !== 'qwen/qwen3.8-27b') {
+        console.warn(`Groq model ${model} failed (${res.status}), retrying with qwen/qwen3.8-27b...`);
+        body.model = 'qwen/qwen3.8-27b';
         const retryRes = await fetch(url, {
           method: 'POST',
           headers,
@@ -496,9 +496,9 @@ async function* llmChatStream(options: {
   }
 
   // If primary Groq model fails (e.g. rate limit 429), try secondary model
-  if (!res.ok && isGroq && model !== 'qwen/qwen3.6-27b') {
-    console.warn(`Groq stream model ${model} failed (${res.status}), retrying with qwen/qwen3.6-27b...`);
-    body.model = 'qwen/qwen3.6-27b';
+  if (!res.ok && isGroq && model !== 'qwen/qwen3.8-27b') {
+    console.warn(`Groq stream model ${model} failed (${res.status}), retrying with qwen/qwen3.8-27b...`);
+    body.model = 'qwen/qwen3.8-27b';
     const retryRes = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
     if (retryRes.ok && retryRes.body) {
       res = retryRes;
@@ -539,6 +539,45 @@ async function* llmChatStream(options: {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let inThink = false;
+  let thinkBuffer = '';
+
+  const filterThinkChunk = function*(text: string): Generator<string> {
+    if (!text) return;
+    if (inThink) {
+      thinkBuffer += text;
+      const endIdx = thinkBuffer.indexOf('</think>');
+      if (endIdx !== -1) {
+        inThink = false;
+        const remainder = thinkBuffer.slice(endIdx + 8);
+        thinkBuffer = '';
+        if (remainder) yield* filterThinkChunk(remainder);
+      }
+      return;
+    }
+
+    const startIdx = text.indexOf('<think>');
+    if (startIdx !== -1) {
+      const before = text.slice(0, startIdx);
+      if (before) yield before;
+      inThink = true;
+      thinkBuffer = text.slice(startIdx + 7);
+      const endIdx = thinkBuffer.indexOf('</think>');
+      if (endIdx !== -1) {
+        inThink = false;
+        const remainder = thinkBuffer.slice(endIdx + 8);
+        thinkBuffer = '';
+        if (remainder) yield* filterThinkChunk(remainder);
+      }
+      return;
+    }
+
+    // Suppress raw thinking header if model outputs thinking without tags
+    if (text.startsWith("Here's a thinking process:")) return;
+
+    yield text;
+  };
+
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -554,10 +593,13 @@ async function* llmChatStream(options: {
         try {
           const json = JSON.parse(data);
           const delta = json.choices?.[0]?.delta?.content;
-          if (typeof delta === 'string' && delta) yield delta;
-          else if (Array.isArray(delta)) {
+          if (typeof delta === 'string' && delta) {
+            for (const c of filterThinkChunk(delta)) yield c;
+          } else if (Array.isArray(delta)) {
             for (const part of delta) {
-              if (typeof part?.text === 'string' && part.text) yield part.text;
+              if (typeof part?.text === 'string' && part.text) {
+                for (const c of filterThinkChunk(part.text)) yield c;
+              }
             }
           }
         } catch {
@@ -573,7 +615,7 @@ async function* llmChatStream(options: {
 function extractJson(text: string): any {
   if (!text) return {};
   const cleaned = text
-    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
     .replace(/```json\s*/gi, '')
     .replace(/```\s*$/gi, '')
     .trim();
@@ -1098,7 +1140,7 @@ ${locationBlock}
 ${webContextBlock}
 ${personaBlock}
 User Name: ${params.userContext?.userName || params.userContext?.userIdentity?.name || 'friend'}
-Output ONLY chat message(s). Follow the bubble target instruction above. No "NEXUS:" prefix.`;
+CRITICAL OUTPUT CONSTRAINT: Output ONLY the direct chat message(s). NEVER output <think> tags, chain-of-thought, reasoning steps, or prompt constraint analysis. Begin immediately with the message. Follow the bubble target instruction above. No "NEXUS:" prefix.`;
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1300,7 +1342,8 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
     const cleanedRaw = raw
       .replace(/<<READY_FOR_PLAN>>/gi, '')
       .replace(/<<PLAN_APPROVED>>/gi, '')
-      .replace(/<think>[\s\S]*?<\/think>/gi, '');
+      .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
+      .replace(/^Here's a thinking process:[\s\S]*?(?=(?:hey|hi|hello|yo|what|gotchu|let's|i'm|i |my |bro|dude|\n\n|$))/i, '');
 
     const rawBubbles = cleanedRaw
       .split(/(?:\|\|(?:BUBBLE)?\|\||\|\|)/)
@@ -1358,38 +1401,78 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
       }
     } catch (streamErr: any) {
       console.warn(`Streaming failed on backend ${this.backend}:`, streamErr?.message || streamErr);
-      if (!raw.trim()) {
-        // Swift failover to Groq 120B if primary was OpenRouter or stalled (>8s)
-        if (process.env.GROQ_API_KEY && this.backend !== 'groq') {
-          console.log('Stream stalled or failed, swiftly failing over to Groq 120B...');
-          try {
-            for await (const chunk of llmChatStream({
-              backend: 'groq',
-              temperature: isOnboarding ? 0.65 : 0.9,
-              messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
-              maxTokens: 500,
-              timeoutMs: 15000,
-            })) {
-              raw += chunk;
-              onDelta(chunk);
-            }
-          } catch (groqErr) {
-            console.warn('Groq failover also failed:', groqErr);
-          }
-        }
+    }
 
-        if (!raw.trim()) {
-          const fallback = await new FallbackAIAdapter().chatCompanion(params);
-          const fallbackText = (fallback as any).messages?.[0] || fallback.reply || 'hey i hear u -- tell me more';
-          onDelta(fallbackText);
-          return {
-            reply: fallbackText,
-            messages: [fallbackText],
-            readyForPlan: fallback.readyForPlan,
-            planApproved: fallback.planApproved,
-          };
+    // Tier 2: Groq fast failover (if primary stalled or failed)
+    if (!raw.trim() && process.env.GROQ_API_KEY) {
+      const backupModel = this.backend === 'groq' ? 'qwen/qwen3.8-27b' : 'openai/gpt-oss-120b';
+      console.log(`Stream failing over to Groq (${backupModel})...`);
+      try {
+        for await (const chunk of llmChatStream({
+          backend: 'groq',
+          model: backupModel,
+          temperature: isOnboarding ? 0.65 : 0.9,
+          messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
+          maxTokens: 500,
+          timeoutMs: 15000,
+        })) {
+          raw += chunk;
+          onDelta(chunk);
         }
+      } catch (groqErr: any) {
+        console.warn(`Groq failover (${backupModel}) also failed:`, groqErr?.message || groqErr);
       }
+    }
+
+    // Tier 3: Secondary Groq model (qwen/qwen3.8-27b) or OpenRouter
+    if (!raw.trim() && process.env.GROQ_API_KEY) {
+      console.log('Stream failing over to Groq secondary tier (qwen/qwen3.8-27b)...');
+      try {
+        for await (const chunk of llmChatStream({
+          backend: 'groq',
+          model: 'qwen/qwen3.8-27b',
+          temperature: isOnboarding ? 0.65 : 0.9,
+          messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
+          maxTokens: 500,
+          timeoutMs: 15000,
+        })) {
+          raw += chunk;
+          onDelta(chunk);
+        }
+      } catch (tier3Err: any) {
+        console.warn('Groq tier 3 failover failed:', tier3Err?.message || tier3Err);
+      }
+    }
+
+    // Emergency Tier 4: OpenRouter if not already used
+    if (!raw.trim() && process.env.OPENROUTER_API_KEY && this.backend !== 'openrouter') {
+      console.log('Stream failing over to OpenRouter emergency tier...');
+      try {
+        for await (const chunk of llmChatStream({
+          backend: 'openrouter',
+          temperature: isOnboarding ? 0.65 : 0.9,
+          messages: [{ role: 'system', content: nexusSystemPrompt(params) }, ...history],
+          maxTokens: 500,
+          timeoutMs: 15000,
+        })) {
+          raw += chunk;
+          onDelta(chunk);
+        }
+      } catch (orErr: any) {
+        console.warn('OpenRouter emergency failover failed:', orErr?.message || orErr);
+      }
+    }
+
+    if (!raw.trim()) {
+      const fallback = await new FallbackAIAdapter().chatCompanion(params);
+      const fallbackText = (fallback as any).messages?.[0] || fallback.reply || 'hey i hear u -- tell me more';
+      onDelta(fallbackText);
+      return {
+        reply: fallbackText,
+        messages: [fallbackText],
+        readyForPlan: fallback.readyForPlan,
+        planApproved: fallback.planApproved,
+      };
     }
 
     const responseCoverage = isOnboarding ? analyzeIntakeCoverage(params.messages || [], params.userContext?.userIdentity) : undefined;
@@ -1398,7 +1481,8 @@ Verification mode: ${params.verificationMode || (params.imageBase64 ? 'proof' : 
     const cleanedRaw = raw
       .replace(/<<READY_FOR_PLAN>>/gi, '')
       .replace(/<<PLAN_APPROVED>>/gi, '')
-      .replace(/<think>[\s\S]*?<\/think>/gi, '');
+      .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
+      .replace(/^Here's a thinking process:[\s\S]*?(?=(?:hey|hi|hello|yo|what|gotchu|let's|i'm|i |my |bro|dude|\n\n|$))/i, '');
 
     const rawBubbles = cleanedRaw
       .split(/(?:\|\|(?:BUBBLE)?\|\||\|\|)/)

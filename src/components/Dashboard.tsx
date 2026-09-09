@@ -278,18 +278,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-black border border-emerald-500/25 rounded-2xl p-4 sm:p-5 shadow-2xl shadow-emerald-950/20 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 transition-all duration-300 hover:border-white/15">
         <div className="space-y-3 flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
               <Target className="w-4 h-4 text-emerald-400" />
               <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-300 font-bold">Today's Mission</span>
               {candidateMissionGoals.length > 1 && (
-                <div className="flex items-center bg-zinc-950/90 border border-emerald-500/30 rounded-lg px-1.5 py-0.5 gap-1 shadow-sm">
+                <div className="flex items-center bg-zinc-950/70 border border-white/[0.08] rounded-full px-2 py-0.5 gap-1 shadow-sm">
                   <button
                     type="button"
                     onClick={handlePrevMissionGoal}
-                    className="p-1 hover:text-emerald-300 text-zinc-400 hover:bg-zinc-850 rounded transition-colors"
+                    className="p-1 hover:text-emerald-300 text-zinc-400 hover:bg-white/[0.06] rounded-full transition-colors"
                     title="Previous Goal"
                     aria-label="Previous Goal"
                   >
@@ -301,7 +301,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <button
                     type="button"
                     onClick={handleNextMissionGoal}
-                    className="p-1 hover:text-emerald-300 text-zinc-400 hover:bg-zinc-850 rounded transition-colors"
+                    className="p-1 hover:text-emerald-300 text-zinc-400 hover:bg-white/[0.06] rounded-full transition-colors"
                     title="Next Goal"
                     aria-label="Next Goal"
                   >
@@ -313,7 +313,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={() => currentMissionGoal ? onToggleGoal(currentMissionGoal.id) : onOpenAddGoal()}
-              className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-500/10 border border-amber-500/25 px-2.5 py-0.5 rounded-lg font-semibold"
+              className="text-[11px] text-amber-300 hover:text-amber-200 bg-amber-500/10 border border-amber-500/25 px-2.5 py-1 rounded-full font-semibold transition-all hover:bg-amber-500/20"
             >
               What should I do next?
             </button>
@@ -330,12 +330,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     key={g.id}
                     type="button"
                     onClick={() => setSelectedMissionGoalId(g.id)}
-                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/50 shadow-sm shadow-emerald-950/40 ring-1 ring-emerald-500/30'
+                        ? 'bg-white/[0.12] text-white border border-white/20 shadow-sm'
                         : isDone
-                          ? 'bg-zinc-900/50 text-zinc-500 border border-zinc-850 line-through'
-                          : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                          ? 'bg-zinc-900/40 text-zinc-500 border border-white/[0.04] line-through'
+                          : 'bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-white/[0.06]'
                     }`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-emerald-400' : isDone ? 'bg-zinc-600' : 'bg-amber-400'}`} />
@@ -358,20 +358,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 min-w-full lg:min-w-[480px]">
-          <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 min-w-full lg:min-w-[480px]">
+          <div className="glass-card-subtle rounded-2xl p-3.5 border border-white/[0.06]">
             <p className="text-[10px] text-zinc-500 uppercase font-mono">Progress</p>
             <p className="text-xl font-bold text-emerald-400 font-mono">{missionPercent}%</p>
           </div>
-          <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3">
+          <div className="glass-card-subtle rounded-2xl p-3.5 border border-white/[0.06]">
             <p className="text-[10px] text-zinc-500 uppercase font-mono">Done</p>
             <p className="text-xl font-bold text-white font-mono">{completedTodayCount}/{activeGoals.length}</p>
           </div>
-          <div className="bg-zinc-950/80 border border-amber-500/25 rounded-xl p-3">
+          <div className="glass-card-subtle rounded-2xl p-3.5 border border-white/[0.06]">
             <div className="flex items-center justify-between">
               <p className="text-[10px] text-zinc-500 uppercase font-mono">NEXUS XP</p>
               {nexusPoints.todayStreakMultiplier > 1 && (
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
                   {nexusPoints.todayStreakMultiplier}x
                 </span>
               )}
@@ -415,9 +415,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Major Life Targets Banner (Ultimate Endpoints) */}
       {((userConfig.masterBlueprint?.lifetimeMegaGoals && userConfig.masterBlueprint.lifetimeMegaGoals.length > 0) ||
         (userConfig.userIdentity?.lifeGoals && userConfig.userIdentity.lifeGoals.length > 0)) && (
-        <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-black border border-amber-500/25 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-start space-x-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+        <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-300 hover:border-white/15">
+          <div className="flex items-start space-x-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
               <Crown className="w-5 h-5" />
             </div>
             <div className="min-w-0">
@@ -427,11 +427,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   Ultimate Endpoints
                 </span>
               </div>
-              <div className="flex flex-wrap gap-2 mt-1.5">
+              <div className="flex flex-wrap gap-2 mt-2">
                 {(userConfig.masterBlueprint?.lifetimeMegaGoals || (userConfig.userIdentity?.lifeGoals || []).map((g) => ({ title: g, timelineEstimate: 'Long-term' }))).slice(0, 4).map((mg, idx) => (
                   <span
                     key={idx}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 font-medium"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass-card-subtle border border-white/[0.08] text-xs text-zinc-200 font-medium"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                     <span>{mg.title}</span>
@@ -450,7 +450,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateTab('blueprint')}
-                className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-xl border border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer active:scale-95"
+                className="px-3.5 py-1.5 glass-card-subtle hover:bg-white/[0.08] text-zinc-200 text-xs font-semibold rounded-full border border-white/[0.1] transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <span>View Blueprint</span>
                 <ArrowRight className="w-3 h-3 text-amber-400" />
@@ -464,8 +464,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Composite Life Score & Overview Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
         {/* Radar Chart Section (7 cols) */}
-        <div className="lg:col-span-7 bg-gradient-to-br from-zinc-950/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-amber-500/25 hover:border-amber-400/40 rounded-2xl p-5 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between space-y-4 transition-all duration-300">
-          <div className="flex items-start sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
+        <div className="lg:col-span-7 glass-card rounded-3xl p-5 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between space-y-4 transition-all duration-300 hover:border-white/15">
+          <div className="flex items-start sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
             <div className="min-w-0 flex-1">
               <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center space-x-2">
                 <span>Category Balance Matrix</span>
@@ -478,10 +478,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               initial={{ scale: 1 }}
               animate={{ scale: [1, 1.02, 1] }}
               transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-              className="relative flex items-center gap-2 bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-teal-500/15 px-3 py-1.5 rounded-xl border border-emerald-500/35 shadow-sm shadow-emerald-500/10 overflow-hidden shrink-0 whitespace-nowrap self-start sm:self-center"
+              className="relative flex items-center gap-2 bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-teal-500/15 px-3 py-1.5 rounded-full border border-emerald-500/35 shadow-sm shadow-emerald-500/10 overflow-hidden shrink-0 whitespace-nowrap self-start sm:self-center"
             >
               {/* Subtle pulsing background aura */}
-              <div className="absolute -inset-1 rounded-xl bg-emerald-500/15 blur-sm animate-pulse pointer-events-none" />
+              <div className="absolute -inset-1 rounded-full bg-emerald-500/15 blur-sm animate-pulse pointer-events-none" />
               <div className="relative z-10 flex items-center gap-1.5">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -532,14 +532,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </ResponsiveContainer>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-zinc-800/60 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 border-t border-white/[0.06] text-center">
             {(Object.keys(CATEGORY_NAMES) as CategoryKey[]).map((catKey, idx) => {
               const score = scoreData.scores[catKey];
               const decay = scoreData.absenceDecays[catKey];
               return (
                 <div
                   key={catKey}
-                  className={`bg-zinc-950/80 p-2.5 rounded-xl border border-zinc-800/80 hover:border-amber-500/30 flex flex-col items-center justify-between shadow-sm transition-colors ${
+                  className={`glass-card-subtle p-3 rounded-2xl border border-white/[0.06] hover:border-white/15 flex flex-col items-center justify-between shadow-sm transition-all ${
                     idx === 4 ? 'col-span-2 sm:col-span-1' : ''
                   }`}
                 >
@@ -565,11 +565,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Category Breakdown & Decay Alerts (5 cols) */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-zinc-950/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-amber-500/25 hover:border-amber-400/40 rounded-2xl p-5 sm:p-6 shadow-2xl flex flex-col justify-between space-y-4 transition-all duration-300">
+        <div className="lg:col-span-5 glass-card rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col justify-between space-y-4 transition-all duration-300 hover:border-white/15">
           <div>
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80 mb-3">
+            <div className="flex items-center justify-between pb-2 border-b border-white/[0.06] mb-3">
               <h3 className="text-base font-bold text-white">Category Status</h3>
-              <div className="flex items-center space-x-1 text-xs text-emerald-400 font-mono font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+              <div className="flex items-center space-x-1 text-xs text-emerald-400 font-mono font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
                 <span>{scoreData.totalCompleted} / {scoreData.totalGoals} Completed</span>
               </div>
             </div>
@@ -583,7 +583,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 return (
                   <div
                     key={catKey}
-                    className="p-3.5 bg-zinc-950/80 rounded-xl border border-zinc-800/80 hover:border-zinc-700/80 transition-all shadow-sm"
+                    className="p-3.5 glass-card-subtle rounded-2xl border border-white/[0.06] hover:border-white/15 transition-all shadow-sm"
                   >
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center space-x-2">
@@ -594,7 +594,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </div>
                       <div className="flex items-center space-x-2">
                         {decay > 0 && (
-                          <span className="text-[10px] text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20 font-mono">
+                          <span className="text-[10px] text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20 font-mono">
                             Decaying (-{decay.toFixed(1)}%/d)
                           </span>
                         )}
@@ -605,7 +605,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="w-full bg-zinc-800/80 h-2 rounded-full overflow-hidden">
+                    <div className="w-full bg-zinc-800/60 h-2 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
@@ -619,41 +619,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
               })}
             </div>
           </div>
-
-          {/* Health API Integration Toggle */}
-          <div className="pt-3 border-t border-zinc-800/60 flex items-center justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                <Activity className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-zinc-200">Health API Sync</p>
-                <p className="text-[10px] text-zinc-400 font-light">Fitbit & Wearables Sync Integration</p>
-              </div>
-            </div>
-            <button
-              onClick={() => onToggleHealthSync(!userConfig.healthApiSyncEnabled)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm ${
-                userConfig.healthApiSyncEnabled
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
-              }`}
-            >
-              {userConfig.healthApiSyncEnabled ? 'Synced ✓' : 'Enable Sync'}
-            </button>
-          </div>
         </div>
       </div>
 
       {/* Today's Goal Checklist Section */}
 
-      <div className="bg-gradient-to-br from-zinc-950/90 via-zinc-900/80 to-black/90 backdrop-blur-xl border border-amber-500/25 hover:border-amber-400/40 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 transition-all duration-300">
+      <div className="glass-card rounded-3xl p-5 sm:p-6 shadow-2xl space-y-6 transition-all duration-300 hover:border-white/15">
         {/* Personal Momentum Highlights Banner */}
-        <div className="mb-5 grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3.5 bg-zinc-950/90 border border-zinc-800/80 rounded-xl">
-          <div className={`flex items-center space-x-3 p-2 rounded-lg border transition-all ${
+        <div className="mb-5 grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 glass-card-subtle rounded-2xl border border-white/[0.06]">
+          <div className={`flex items-center space-x-3 p-2.5 rounded-xl border transition-all ${
             lifetimeBestGoals.length > 0
               ? 'bg-amber-500/10 border-amber-500/30 shadow-sm shadow-amber-950/20'
-              : 'bg-amber-500/5 border-amber-500/10'
+              : 'bg-white/[0.02] border-white/[0.04]'
           }`}>
             <div className={`p-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 ${
               lifetimeBestGoals.length > 0 ? 'animate-pulse' : ''
@@ -677,10 +654,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          <div className={`flex items-center space-x-3 p-2 rounded-lg border transition-all ${
+          <div className={`flex items-center space-x-3 p-2.5 rounded-xl border transition-all ${
             over5StreakGoals.length > 0
               ? 'bg-orange-500/10 border-orange-500/30 shadow-sm shadow-orange-950/20'
-              : 'bg-orange-500/5 border-orange-500/10'
+              : 'bg-white/[0.02] border-white/[0.04]'
           }`}>
             <div className={`p-2 rounded-lg bg-orange-500/15 border border-orange-500/30 text-orange-400 ${
               over5StreakGoals.length > 0 ? 'animate-pulse' : ''
@@ -697,7 +674,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 p-2 bg-emerald-500/5 rounded-lg border border-emerald-500/10">
+          <div className="flex items-center space-x-3 p-2.5 bg-emerald-500/5 rounded-xl border border-emerald-500/15">
             <div className="p-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
               <TrendingUp className="w-4 h-4" />
             </div>
@@ -748,12 +725,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           {/* View Mode Toggle & Controls */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center p-0.5 bg-zinc-950 border border-zinc-800 rounded-xl">
+            <div className="flex items-center p-0.5 bg-white/[0.04] border border-white/[0.08] rounded-xl backdrop-blur-md">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-all flex items-center space-x-1 ${
                   viewMode === 'grid'
-                    ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+                    ? 'bg-white/[0.12] text-white shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -764,7 +741,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 onClick={() => setViewMode('folderGrouped')}
                 className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-all flex items-center space-x-1 ${
                   viewMode === 'folderGrouped'
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-indigo-600/90 text-white shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -774,12 +751,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Streak Quick Filters */}
-            <div className="flex items-center p-0.5 bg-zinc-950 border border-zinc-800 rounded-xl">
+            <div className="flex items-center p-0.5 bg-white/[0.04] border border-white/[0.08] rounded-xl backdrop-blur-md">
               <button
                 onClick={() => setFilterStreak('all')}
                 className={`px-2.5 py-1 text-[11px] font-medium rounded-lg transition-all ${
                   filterStreak === 'all'
-                    ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+                    ? 'bg-white/[0.12] text-zinc-100 shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -812,7 +789,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500"
+              className="bg-zinc-900/80 border border-white/[0.08] rounded-xl px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500/50 backdrop-blur-md"
             >
               <option value="all">All Categories</option>
               <option value="health">Health</option>
@@ -824,7 +801,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             <button
               onClick={onOpenAddGoal}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-xl flex items-center space-x-1.5 transition-all shadow-md shadow-emerald-950/30 cursor-pointer"
+              className="px-3 py-1.5 bg-emerald-600/90 hover:bg-emerald-500 text-white text-xs font-medium rounded-xl flex items-center space-x-1.5 transition-all shadow-[0_4px_20px_rgba(16,185,129,0.25)] cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>New Goal</span>
@@ -839,10 +816,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </span>
           <button
             onClick={() => setFilterFolder('all')}
-            className={`px-3 py-1 rounded-xl text-xs font-medium transition-all shrink-0 ${
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 ${
               filterFolder === 'all'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm'
-                : 'bg-zinc-950/80 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                : 'bg-white/[0.04] text-zinc-400 hover:text-zinc-200 border border-white/[0.06]'
             }`}
           >
             All Labels ({activeGoals.length})
@@ -866,14 +843,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <button
                 key={folderName}
                 onClick={() => setFilterFolder(folderName)}
-                className={`px-3 py-1 rounded-xl text-xs font-medium transition-all shrink-0 flex items-center space-x-1.5 ${
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 flex items-center space-x-1.5 ${
                   isSelected
                     ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm'
-                    : 'bg-zinc-950/80 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
+                    : 'bg-white/[0.04] text-zinc-400 hover:text-zinc-200 border border-white/[0.06]'
                 }`}
               >
                 <span>🏷️ {folderName}</span>
-                <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-zinc-800 text-zinc-300 font-mono">
+                <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-white/[0.08] text-zinc-300 font-mono">
                   {count}
                 </span>
               </button>
@@ -882,7 +859,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <button
             onClick={() => setShowFolderModal(true)}
-            className="px-2.5 py-1 rounded-xl text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-zinc-950/80 hover:bg-emerald-950/30 border border-emerald-500/30 transition-all shrink-0 flex items-center space-x-1"
+            className="px-2.5 py-1 rounded-full text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-white/[0.04] hover:bg-emerald-500/10 border border-emerald-500/30 transition-all shrink-0 flex items-center space-x-1"
           >
             <FolderPlus className="w-3.5 h-3.5" />
             <span>+ Custom Label</span>
@@ -934,10 +911,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               return (
                 <div
                   key={folderName}
-                  className="bg-zinc-950/60 border border-zinc-800/80 rounded-2xl p-4 space-y-3"
+                  className="glass-card rounded-3xl p-4 sm:p-5 space-y-3"
                 >
                   {/* Folder Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800/80">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/[0.06]">
                     <div className="flex items-center space-x-2.5">
                       <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
                         <Folder className="w-4 h-4" />
@@ -961,7 +938,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <span>Folder Completion</span>
                         <span className="text-cyan-400 font-bold">{percent}%</span>
                       </div>
-                      <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+                      <div className="w-full h-1.5 bg-white/[0.05] rounded-full overflow-hidden border border-white/[0.08]">
                         <div
                           className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-500"
                           style={{ width: `${percent}%` }}
@@ -986,20 +963,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       const isFlameOver5 = streakInfo.streak > 5;
                       const isLifetimeBest = streakInfo.streak > 0 && streakInfo.streak >= bestStreak;
 
-                      let cardStyle = 'bg-zinc-900/90 border-zinc-800/80 hover:border-zinc-700/80';
+                      let cardStyle = 'glass-card-subtle border-white/[0.07] hover:border-white/20';
                       if (isLifetimeBest) {
-                        cardStyle = 'bg-gradient-to-br from-amber-950/30 via-zinc-950 to-zinc-950 border-amber-500/50 shadow-md shadow-amber-950/20 ring-1 ring-amber-500/20';
+                        cardStyle = 'bg-gradient-to-br from-amber-500/[0.08] via-zinc-900/50 to-zinc-950/80 backdrop-blur-xl border-amber-500/40 shadow-[0_8px_32px_rgba(245,158,11,0.12)] ring-1 ring-amber-500/25';
                       } else if (isFlameOver5) {
-                        cardStyle = 'bg-gradient-to-br from-orange-950/25 via-zinc-950 to-zinc-950 border-orange-500/40 shadow-sm shadow-orange-950/10';
+                        cardStyle = 'bg-gradient-to-br from-orange-500/[0.07] via-zinc-900/50 to-zinc-950/80 backdrop-blur-xl border-orange-500/30 shadow-[0_8px_32px_rgba(249,115,22,0.10)]';
                       } else if (isCompleted) {
-                        cardStyle = 'bg-emerald-950/20 border-emerald-500/30';
+                        cardStyle = 'bg-emerald-500/[0.06] backdrop-blur-xl border-emerald-500/30';
                       }
 
                       return (
                         <div
                           key={goal.id}
                           onClick={() => setActivePathwayGoal(goal)}
-                          className={`p-3.5 rounded-xl border transition-all flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-amber-500/50 hover:shadow-lg ${cardStyle}`}
+                          className={`p-3.5 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden cursor-pointer hover:shadow-lg ${cardStyle}`}
                         >
                           <div>
                             <div className="flex items-start justify-between space-x-3 mb-1.5">
@@ -1039,7 +1016,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             </div>
 
                             {/* Tomorrow's Step Quick Preview Banner */}
-                            <div className="mt-2 p-1.5 rounded-lg bg-zinc-950/80 border border-amber-500/25 flex items-center justify-between gap-1.5 hover:bg-amber-500/10 transition-colors">
+                            <div className="mt-2 p-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-between gap-1.5 hover:bg-white/[0.06] transition-colors">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span className="text-[8px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded border border-amber-500/30 shrink-0 whitespace-nowrap">
                                   Tomorrow's Step
@@ -1054,7 +1031,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between pt-2 border-t border-zinc-800/60 mt-2">
+                          <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] mt-2">
                             <div className="flex items-center space-x-1 flex-wrap gap-y-0.5">
                               <span className="text-[9px] uppercase font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                                 {CATEGORY_NAMES[goal.category]}
@@ -1137,20 +1114,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
               const isLifetimeBest = streakInfo.streak > 0 && streakInfo.streak >= bestStreak;
 
               // Card styling based on streak status
-              let cardStyle = 'bg-zinc-950/80 border-zinc-800/80 hover:border-zinc-700/80';
+              let cardStyle = 'glass-card-subtle border-white/[0.07] hover:border-white/20';
               if (isLifetimeBest) {
-                cardStyle = 'bg-gradient-to-br from-amber-950/30 via-zinc-950 to-zinc-950 border-amber-500/50 shadow-md shadow-amber-950/20 ring-1 ring-amber-500/20';
+                cardStyle = 'bg-gradient-to-br from-amber-500/[0.08] via-zinc-900/50 to-zinc-950/80 backdrop-blur-xl border-amber-500/40 shadow-[0_8px_32px_rgba(245,158,11,0.12)] ring-1 ring-amber-500/25';
               } else if (isFlameOver5) {
-                cardStyle = 'bg-gradient-to-br from-orange-950/25 via-zinc-950 to-zinc-950 border-orange-500/40 shadow-sm shadow-orange-950/10';
+                cardStyle = 'bg-gradient-to-br from-orange-500/[0.07] via-zinc-900/50 to-zinc-950/80 backdrop-blur-xl border-orange-500/30 shadow-[0_8px_32px_rgba(249,115,22,0.10)]';
               } else if (isCompleted) {
-                cardStyle = 'bg-emerald-950/20 border-emerald-500/30';
+                cardStyle = 'bg-emerald-500/[0.06] backdrop-blur-xl border-emerald-500/30';
               }
 
               return (
                 <div
                   key={goal.id}
                   onClick={() => setActivePathwayGoal(goal)}
-                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between relative overflow-hidden cursor-pointer hover:border-amber-500/50 hover:shadow-xl ${cardStyle}`}
+                  className={`p-4 rounded-2xl border transition-all flex flex-col justify-between relative overflow-hidden cursor-pointer hover:shadow-xl ${cardStyle}`}
                 >
                   {/* Subtle Top Accent Ribbon for Lifetime Best or Hot (>5) Streaks */}
                   {isLifetimeBest && (
@@ -1305,7 +1282,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             <span className="font-bold">{streakInfo.streak}d streak</span>
                           </div>
                         ) : (
-                          <div className={`flex items-center space-x-1 text-xs font-mono px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-amber-400 ${
+                          <div className={`flex items-center space-x-1 text-xs font-mono px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-amber-400 ${
                             streakInfo.streak >= 3 ? 'animate-pulse border-amber-500/30' : ''
                           }`}>
                             <Flame className={`w-3 h-3 fill-amber-400/30 ${streakInfo.streak >= 3 ? 'animate-bounce' : ''}`} />
@@ -1325,7 +1302,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     {/* Tomorrow's Action Quick Preview Banner (Full-width row) */}
-                    <div className="mt-3 p-2.5 rounded-xl bg-zinc-950/90 border border-amber-500/25 hover:border-amber-400/40 hover:bg-amber-500/5 transition-all">
+                    <div className="mt-3 p-2.5 rounded-2xl bg-white/[0.03] border border-white/[0.07] hover:border-amber-400/40 hover:bg-white/[0.05] transition-all">
                       <div className="flex items-center justify-between mb-1 gap-2">
                         <span className="text-[9px] font-mono font-bold uppercase text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 whitespace-nowrap shrink-0">
                           Tomorrow's Step
@@ -1356,7 +1333,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     )}
 
                     {/* Effects Tags & Proof Media Button */}
-                    <div className="flex items-center justify-between pt-2.5 border-t border-zinc-800/60">
+                    <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.06]">
                       <div className="flex flex-wrap items-center gap-1">
                         {goal.isLifePathAligned && (
                           <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
