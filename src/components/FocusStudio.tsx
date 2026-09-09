@@ -418,7 +418,7 @@ export const FocusStudio: React.FC<FocusStudioProps> = ({ goals, dailyLogs, toda
 
   return (
     <div className="space-y-5">
-      <section className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-zinc-900/80 p-4 sm:p-6 shadow-2xl shadow-black/30">
+      <section className="glass-card relative overflow-hidden rounded-2xl border-emerald-500/20 p-4 sm:p-6 shadow-2xl shadow-black/30">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-amber-300 to-rose-400" />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -439,7 +439,7 @@ export const FocusStudio: React.FC<FocusStudioProps> = ({ goals, dailyLogs, toda
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* Audio Engine Box */}
-        <section className="rounded-2xl border border-cyan-500/30 bg-zinc-900/90 p-5 shadow-xl shadow-black/30 space-y-4 relative overflow-hidden ring-1 ring-cyan-500/20">
+        <section className="glass-card-premium rounded-2xl border border-cyan-500/30 p-5 shadow-xl shadow-black/30 space-y-4 relative overflow-hidden ring-1 ring-cyan-500/20">
           <div className="flex items-center justify-between gap-3 border-b border-zinc-800 pb-3">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
@@ -588,7 +588,7 @@ export const FocusStudio: React.FC<FocusStudioProps> = ({ goals, dailyLogs, toda
           </div>
         </section>
 
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/75 p-4 shadow-xl shadow-black/20">
+        <section className="glass-card rounded-2xl border border-zinc-800 p-4 shadow-xl shadow-black/20">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <Quote className="h-5 w-5 text-amber-300" />
@@ -649,7 +649,7 @@ export const FocusStudio: React.FC<FocusStudioProps> = ({ goals, dailyLogs, toda
         </section>
       </div>
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/75 p-4 shadow-xl shadow-black/20">
+      <section className="glass-card rounded-2xl border border-zinc-800 p-4 shadow-xl shadow-black/20">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <ImagePlus className="h-5 w-5 text-rose-300" />
@@ -711,7 +711,7 @@ export const FocusStudio: React.FC<FocusStudioProps> = ({ goals, dailyLogs, toda
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/75 p-4">
+        <div className="glass-card-subtle rounded-2xl border border-zinc-800 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <Bell className="h-5 w-5 text-emerald-300" />
             Ethical Reminder Preview
@@ -720,7 +720,7 @@ export const FocusStudio: React.FC<FocusStudioProps> = ({ goals, dailyLogs, toda
             Your progress is becoming visible to you. Keep the promise small enough to complete today.
           </p>
         </div>
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/75 p-4">
+        <div className="glass-card-subtle rounded-2xl border border-zinc-800 p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-white">
             <AudioWaveform className="h-5 w-5 text-cyan-300" />
             Adaptive Audio Note

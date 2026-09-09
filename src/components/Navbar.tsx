@@ -32,8 +32,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [copiedNotification, setCopiedNotification] = useState(false);
-  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
-  const lastScrollY = useRef(0);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(false);
+  const reachedTopOnceRef = useRef(false);
+  const reachedTopAtRef = useRef(0);
+  const touchStartY = useRef(0);
+  const touchStartedAtTop = useRef(false);
 
   useEffect(() => {
     let ticking = false;
@@ -42,27 +45,65 @@ export const Navbar: React.FC<NavbarProps> = ({
       if (!ticking) {
         window.requestAnimationFrame(() => {
           const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
-          const delta = currentScrollY - lastScrollY.current;
 
-          if (currentScrollY <= 8) {
-            // At the very top of page: always show top bar
-            setIsHeaderHidden(false);
-          } else if (delta < -3) {
-            // Scrolling UPWARDS: pop up the top bar
-            setIsHeaderHidden(false);
-          } else if (delta > 3 && currentScrollY > 20) {
-            // Scrolling DOWNWARDS: tuck away the top bar
-            setIsHeaderHidden(true);
+          if (currentScrollY > 15) {
+            // Anywhere in the body/middle: hide top bar
+            setIsHeaderVisible(false);
+            reachedTopOnceRef.current = false;
+            reachedTopAtRef.current = 0;
+          } else {
+            // Reached top (currentScrollY <= 15)
+            // First time reaching top: do not show yet ("then not yet")
+            if (!reachedTopOnceRef.current) {
+              reachedTopOnceRef.current = true;
+              reachedTopAtRef.current = Date.now();
+            }
           }
-          lastScrollY.current = currentScrollY;
           ticking = false;
         });
         ticking = true;
       }
     };
 
+    // When already at the top, a second scroll gesture (pulling down or wheeling up) reveals the header
+    const handleWheel = (e: WheelEvent) => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      const hasSettledAtTop = Date.now() - reachedTopAtRef.current > 220;
+      if (currentScrollY <= 15 && reachedTopOnceRef.current && hasSettledAtTop && e.deltaY < 0) {
+        setIsHeaderVisible(true);
+      }
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY.current = e.touches[0].clientY;
+      // A pull only counts if this is a new gesture that began at the edge.
+      // This prevents the swipe that arrives at the top from revealing the bar.
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      touchStartedAtTop.current = currentScrollY <= 15 && reachedTopOnceRef.current;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      const touchY = e.touches[0].clientY;
+      const pullDownDistance = touchY - touchStartY.current;
+
+      // When user is at the top of the page, has already arrived at top, and swipes down:
+      if (touchStartedAtTop.current && currentScrollY <= 15 && reachedTopOnceRef.current && pullDownDistance > 25) {
+        setIsHeaderVisible(true);
+      }
+    };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+    };
   }, []);
 
   const handleAnonymizeClick = () => {
@@ -97,7 +138,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <header className={`app-topbar bg-gradient-to-b from-zinc-950/95 via-zinc-950/80 to-transparent backdrop-blur-2xl border-none text-zinc-100 will-change-transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isHeaderHidden ? '-translate-y-full' : 'translate-y-0'}`}>
+    <header className={`app-topbar bg-gradient-to-b from-zinc-950/90 via-zinc-950/72 to-transparent backdrop-blur-2xl border-none text-zinc-100 will-change-transform transition-[transform,opacity,filter] duration-[1800ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${isHeaderVisible ? 'translate-y-0 opacity-100 blur-0 pointer-events-auto' : '-translate-y-full opacity-0 blur-[3px] pointer-events-none'}`}>
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 relative">
           {/* Left spacer for perfect geometric center balance */}

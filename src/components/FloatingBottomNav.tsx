@@ -23,22 +23,11 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
   setCurrentTab,
 }) => {
   const [showMoreDrawer, setShowMoreDrawer] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
-  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastScrollY = useRef(0);
-
-  const resetInactivityTimer = (delayMs = 3500) => {
-    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    inactivityTimer.current = setTimeout(() => {
-      setIsVisible(false);
-    }, delayMs);
-  };
-
-  // When user enters another page, briefly show active tab then auto-hide downwards
-  useEffect(() => {
-    setIsVisible(true);
-    resetInactivityTimer(1500);
-  }, [currentTab]);
+  const [isBottomNavVisible, setIsBottomNavVisible] = useState(false);
+  const reachedBottomOnceRef = useRef(false);
+  const reachedBottomAtRef = useRef(0);
+  const touchStartY = useRef(0);
+  const touchStartedAtBottom = useRef(false);
 
   useEffect(() => {
     let ticking = false;
@@ -53,39 +42,83 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
             document.body.scrollHeight
           );
 
-          const delta = currentScrollY - lastScrollY.current;
-          const isFullyAtTop = currentScrollY <= 8;
-          const isFullyAtBottom = (windowHeight + currentScrollY) >= (totalHeight - 20);
+          const isAtBottom = (windowHeight + currentScrollY) >= (totalHeight - 25);
 
-          if (isFullyAtTop) {
-            // At the very top: hide bottom bar so ONLY top bar pops up
-            setIsVisible(false);
-            if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-          } else if (isFullyAtBottom) {
-            // Scrolled all the way to bottom: show bottom bar
-            setIsVisible(true);
-            resetInactivityTimer(3500);
-          } else if (delta < -3) {
-            // Scrolling UPWARDS towards top: hide bottom bar (ONLY top bar pops up)
-            setIsVisible(false);
-            if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-          } else if (delta > 3) {
-            // Scrolling DOWNWARDS: pop up bottom bar
-            setIsVisible(true);
-            resetInactivityTimer(3500);
+          if (!isAtBottom) {
+            // Anywhere in the body/middle or top: hide bottom nav
+            setIsBottomNavVisible(false);
+            reachedBottomOnceRef.current = false;
+            reachedBottomAtRef.current = 0;
+          } else {
+            // Reached bottom of page
+            // First time reaching bottom: do not show yet ("then not yet")
+            if (!reachedBottomOnceRef.current) {
+              reachedBottomOnceRef.current = true;
+              reachedBottomAtRef.current = Date.now();
+            }
           }
-          lastScrollY.current = currentScrollY;
           ticking = false;
         });
         ticking = true;
       }
     };
 
+    // When already at the bottom, a second scroll gesture (swiping up or wheeling down) reveals the bottom nav
+    const handleWheel = (e: WheelEvent) => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      const windowHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const totalHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      const isAtBottom = (windowHeight + currentScrollY) >= (totalHeight - 25);
+
+      const hasSettledAtBottom = Date.now() - reachedBottomAtRef.current > 220;
+      if (isAtBottom && reachedBottomOnceRef.current && hasSettledAtBottom && e.deltaY > 0) {
+        setIsBottomNavVisible(true);
+      }
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY.current = e.touches[0].clientY;
+      // The gesture that reaches the bottom must not also reveal navigation.
+      // Only a fresh upward pull that starts at the bottom can do that.
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      const windowHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const totalHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      touchStartedAtBottom.current =
+        (windowHeight + currentScrollY) >= (totalHeight - 25) && reachedBottomOnceRef.current;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      const windowHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const totalHeight = Math.max(
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight
+      );
+      const isAtBottom = (windowHeight + currentScrollY) >= (totalHeight - 25);
+      const pullUpDistance = touchStartY.current - e.touches[0].clientY;
+
+      // When user is at the bottom, has arrived at bottom, and swipes up:
+      if (touchStartedAtBottom.current && isAtBottom && reachedBottomOnceRef.current && pullUpDistance > 25) {
+        setIsBottomNavVisible(true);
+      }
+    };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
     };
   }, []);
 
@@ -210,14 +243,14 @@ export const FloatingBottomNav: React.FC<FloatingBottomNavProps> = ({
 
       {/* Main 5-Slot Bottom Floating Bar */}
       <div
-        className={`fixed left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-40 md:hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-          isVisible || showMoreDrawer
-            ? 'translate-y-0 opacity-100 pointer-events-auto'
-            : 'translate-y-28 opacity-0 pointer-events-none'
+        className={`fixed left-1/2 -translate-x-1/2 w-[calc(100%-1.5rem)] max-w-md z-40 md:hidden will-change-transform transition-[transform,opacity,filter] duration-[1800ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          isBottomNavVisible || showMoreDrawer
+            ? 'translate-y-0 opacity-100 blur-0 pointer-events-auto'
+            : 'translate-y-28 opacity-0 blur-[3px] pointer-events-none'
         }`}
         style={{ bottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
       >
-        <nav className="bg-zinc-900/85 backdrop-blur-2xl border border-white/[0.09] rounded-full p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.75)] flex items-center justify-between ring-1 ring-white/[0.04]">
+        <nav className="bg-zinc-900/72 backdrop-blur-2xl border border-white/[0.12] border-t-white/[0.18] rounded-full p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.75),0_0_32px_rgba(245,158,11,0.06)] flex items-center justify-between ring-1 ring-white/[0.05]">
           {/* 4 Primary Navigation Tabs */}
           {primaryNavItems.map((item) => {
             const Icon = item.icon;
